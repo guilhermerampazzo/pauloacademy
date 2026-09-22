@@ -1,10 +1,11 @@
-# Academy Pop — versão 2.2: relatório de alterações para o programador
+# Academy Pop — versão 2.3: relatório de alterações para o programador
 
 **Data:** 22/09/2026
 **Base:** código `pauloacademy-master` (Next.js 14 + Express + PostgreSQL 16 + MinIO + nginx, via Docker Compose)
 **Escopo:** SEO técnico, segurança do checkout, carrinho de compras, busca instantânea, páginas de categoria, conversão, blog e páginas institucionais editáveis.
 **Novo na 2.1:** recuperação de acesso ao painel ("Esqueci minha senha" por e-mail + script de servidor) e verificação em 2 etapas (2FA) para os administradores.
 **Novo na 2.2:** menu "Graduação" com os subitens Bacharelado, Tecnólogo e Superior Sequencial; categoria "Superior" renomeada para "Superior Sequencial"; Blog no menu do topo.
+**Novo na 2.3:** editor de textos do painel corrigido (parágrafos, colagem do Word/Google Docs e links), inserção de link com busca de cursos e pré-visualização do artigo antes de publicar. **Não há migração de banco nem variável de ambiente nova nesta versão.**
 **Fora do escopo (cancelado pelo cliente):** motor de promoções/combos e pedidos de R$ 0,00.
 
 Este documento diz, para cada mudança, **como era**, **como ficou** e **quais arquivos mudaram**. A seção 2 traz o passo a passo para publicar.
@@ -34,12 +35,19 @@ Este documento diz, para cada mudança, **como era**, **como ficou** e **quais a
 | Recuperação de acesso (2.1) | Não existia: quem esquecesse a senha dependia de alguém mexer no banco. | "Esqueci minha senha" com link por e-mail (30 min, uso único) e script no servidor para gerar link, senha temporária ou desligar o 2FA. |
 | 2FA (2.1) | Não existia: só e-mail e senha. | Código de 6 dígitos de app autenticador (TOTP), 10 códigos de recuperação, segredo criptografado, histórico de acessos e avisos por e-mail. |
 | Sessões (2.1) | Token de 7 dias continuava válido mesmo após trocar a senha. | Trocar ou redefinir a senha e desligar o 2FA encerram as outras sessões (`token_version`). |
+| Parágrafos do editor (2.3) | O Enter criava `<div>`, e o site só tinha estilo para `<p>`: o artigo publicado saía com os parágrafos colados, sem espaço entre eles. | O Enter cria `<p>`. O CSS também passou a estilizar `<div>` e `<h1>`, então **o conteúdo já salvo antes também aparece certo**, sem precisar reeditar. |
+| Colar do Word / Google Docs (2.3) | Vinha com a formatação de origem (Arial 11pt cinza, margens zeradas, `<span>` e `id` do Docs), fugindo do padrão do site. | O conteúdo colado é limpo automaticamente: sobram só título, parágrafo, negrito, itálico, listas, tabela, link e imagem. A aparência é sempre a do site. |
+| Inserir link (2.3) | Uma caixinha pedia a URL digitada na mão. Sem seleção, o link saía com o endereço como texto visível. Todo link abria em nova aba. | Janela com busca de curso pelo nome (o endereço é preenchido sozinho), campo do texto clicável, atalhos para as páginas do site e botão "Remover link". Link interno abre na mesma aba; externo, em nova aba. |
+| "Título 1" no editor (2.3) | Gerava um `<h1>` sem estilo (saía do tamanho do texto comum) e um segundo H1 na página, o que atrapalha o Google. | As opções agora são Parágrafo, Título de seção (H2) e Subtítulo (H3). O H1 é só o título do artigo. |
+| Ver antes de publicar (2.3) | Rascunho e post agendado devolvem 404 no site: só dava para conferir depois de publicado. | Botão "Ver como vai ficar" no painel, com o visual real do artigo e a prévia de como aparece no Google. O rascunho continua invisível para o público. |
 
 ---
 
 ## 2. Como publicar (passo a passo)
 
 > Tempo estimado: 30–45 min. Faça fora do horário de pico.
+
+> **Se você já está na 2.2 e vai só para a 2.3:** as mudanças são só de frontend. Substitua os arquivos (seção 2.2), rode `docker compose build frontend && docker compose up -d frontend` e confira a seção 2.7. Não há migração de banco, variável nova nem mudança no backend, no nginx ou no compose.
 
 ### 2.1 Backup (obrigatório)
 
@@ -430,6 +438,51 @@ Todos contam apenas as falhas, exceto "esqueci minha senha", que conta todos os 
 
 ---
 
+### 3.11 Editor do painel, links e pré-visualização do blog (v2.3)
+
+Levantado ao preparar a série de artigos do blog: o cadastro funcionava, mas o resultado publicado saía fora do padrão. Vale para o blog **e** para os textos de curso e das páginas institucionais, porque todos usam o mesmo editor.
+
+**a) Parágrafos colados um no outro**
+
+- **Como era:** o editor (`contentEditable`) usava o padrão do Chrome e criava `<div>` a cada Enter. O CSS `.prose-content` tinha regra para `p`, `h2`, `h3`, `ul`, `ol`, `a` e `strong`, mas **não para `div`** — resultado: margem 0 e o artigo virava um bloco único.
+- **Como ficou:** `document.execCommand('defaultParagraphSeparator', false, 'p')` na montagem do editor; o conteúdo novo sai em `<p>`. Para o que já está salvo, o CSS ganhou `.prose-content div` (mesmo espaçamento de `p`), `h1`, `img`, `blockquote`, `table`, `th`, `td` e listas aninhadas. **Nada precisa ser reeditado.**
+
+**b) Limpeza do conteúdo colado**
+
+- **Como era:** colar do Word ou do Google Docs trazia `style="font-size:11pt;font-family:Arial;color:#1f1f1f"`, `class="MsoNormal"`, `<span id="docs-internal-guid-...">` e margens zeradas. O trecho colado aparecia menor e cinza no meio do artigo.
+- **Como ficou:** `onPaste` limpa o HTML antes de inserir. Sobrevivem `p, br, strong, em, u, s, h2, h3, ul, ol, li, a, img, blockquote, table, thead, tbody, tr, th, td`; `b→strong`, `i→em`, `h1→h2`, `h4/h5/h6→h3`, `div` com texto→`p` (e `div` que só embrulha outros blocos é descartado); todo `style`, `class` e `id` é removido. Testado com HTML real do Word e do Google Docs.
+
+**c) Inserir link (o que mais pesa para vender dentro do artigo)**
+
+- **Como era:** `window.prompt('URL do link:')`. Com 201 cursos, cada link do artigo dependia de digitar o endereço certo na mão — fonte provável de 404. Sem texto selecionado, o Chrome criava o link mostrando a própria URL como texto. E o código forçava `target="_blank"` em **todos** os links da caixa, inclusive os internos.
+- **Como ficou:** janela "Inserir link" com:
+  - campo **"Palavra ou frase que fica clicável"** (já vem preenchido com o texto selecionado);
+  - **busca de curso pelo nome** (usa `GET /search`, o mesmo motor da busca do site) — ao escolher, o endereço `/cursos/{slug}` é preenchido sozinho;
+  - atalhos para as categorias e páginas do site (Todos os cursos, Blog, Como funciona, Reconhecimento MEC, Perguntas frequentes, Sobre nós);
+  - campo livre para colar qualquer endereço;
+  - link interno abre **na mesma aba**; link externo recebe `target="_blank" rel="noopener noreferrer"`;
+  - novo botão **"Remover link"** na barra de ferramentas.
+
+**d) Estilos de texto**
+
+- "Título 1" saiu da lista (gerava `<h1>` sem estilo e um segundo H1 na página). As opções são **Parágrafo**, **Título de seção** (H2) e **Subtítulo** (H3).
+
+**e) Pré-visualização antes de publicar**
+
+- **Como era:** `GET /blog/slug/:slug` só devolve post com `published = true` e `published_at <= NOW()`. Rascunho e post agendado davam 404 — não havia como conferir antes de publicar.
+- **Como ficou:** tela nova `/admin/blog/preview/{id}` (exige login, lê por `GET /blog/admin/:id`) com o visual real do artigo, o aviso de situação (rascunho / agendado para… / no ar) e a prévia de como o post aparece no Google (título, endereço e descrição com a contagem de caracteres). Botões: **"Ver como vai ficar"** no formulário e na lista de posts. **O rascunho continua invisível para o público** — a regra do site não mudou.
+
+**Arquivos:**
+
+- `frontend/src/components/admin/RichTextEditor.tsx` (reescrito)
+- `frontend/src/app/admin/blog/page.tsx` (botões de pré-visualização e dica de link)
+- `frontend/src/app/admin/blog/preview/[id]/page.tsx` (novo)
+- `frontend/src/app/globals.css` (bloco “v2.3”)
+
+**Sem impacto no banco e no `.env`.** Basta recompilar o frontend (seção 2.2/2.5).
+
+---
+
 ## 4. Banco de dados (migrações automáticas em `schema.sql`)
 
 ```
@@ -510,6 +563,7 @@ Nada é apagado nem renomeado.
   - barra fixa no celular;
   - admin (conteúdo, depoimentos, blog, buscas, pedidos);
   - **2.1:** esqueci a senha → link → nova senha → link reutilizado recusado → login → ativação do 2FA pelo QR code → sair → login com código do app → login com código de recuperação.
+  - **2.3 (editor e blog):** digitar 3 parágrafos e conferir que saem em `<p>` com espaçamento no artigo publicado; colar HTML real do Google Docs e do Word e conferir que `style`, `class` e `id` foram removidos (`b→strong`, `i→em`, `h1→h2`, listas e tabela preservadas); selecionar uma palavra, buscar o curso pelo nome na janela de link e conferir o `href` gerado (`/cursos/{slug}`, sem `target`); link externo com `target="_blank" rel="noopener noreferrer"`; botão "Remover link"; reabrir um post salvo e conferir que o conteúdo carrega no editor; pré-visualizar um rascunho (que continua 404 no site) e um post agendado.
 - **nginx:** `nginx -t` sem erros. Teste funcional validou os cabeçalhos de segurança, o redirecionamento 301 do `www`, o cache de `/_next/static` e o proxy de `/api`.
 - **Não testado:** Mercado Pago real (sandbox/produção), upload no MinIO e **envio real de e-mail** (depende do SMTP de vocês). Faça os testes dos passos 2.6 e 2.6-B.
 
@@ -541,6 +595,7 @@ Nada é apagado nem renomeado.
   - `src/app/{como-funciona,reconhecimento-mec,politica-de-privacidade,termos-de-uso}/page.tsx`, `src/app/blog/page.tsx`, `src/app/blog/[slug]/page.tsx`
   - `src/app/admin/{depoimentos,blog,buscas,senha}/page.tsx`
   - 2.1: `src/app/admin/{esqueci-senha,redefinir-senha}/{page,layout}.tsx`, `src/app/admin/login/layout.tsx`, `src/components/admin/{AuthShell,PasswordStrength}.tsx`
+  - 2.3: `src/app/admin/blog/preview/[id]/page.tsx`
 - Alterados:
   - `src/app/{layout,page,not-found}.tsx`, `src/app/globals.css`
   - `src/app/cursos/[slug]/page.tsx`, `src/app/checkout/[slug]/page.tsx`, `src/app/checkout/{sucesso,erro}/page.tsx`
@@ -549,6 +604,7 @@ Nada é apagado nem renomeado.
   - `src/components/public/{Header,Footer,CourseCard,CountdownTimer,WhatsAppButton}.tsx`, `src/components/admin/Sidebar.tsx`
   - `src/types/index.ts`, `next.config.js`, `tailwind.config.js`, `package.json`, `package-lock.json`
   - 2.1: `src/app/admin/login/page.tsx`, `src/app/admin/senha/page.tsx`, `src/app/admin/layout.tsx`, `src/middleware.ts`, `src/lib/{auth,api}.ts`
+  - 2.3: `src/components/admin/RichTextEditor.tsx` (reescrito), `src/app/admin/blog/page.tsx`, `src/app/globals.css`
 
 **Raiz**
 

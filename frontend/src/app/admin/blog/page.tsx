@@ -1,7 +1,8 @@
 'use client'
 // v2: gestão do blog (conteúdo de topo de funil para SEO)
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Edit, Loader2, X, Save, ExternalLink, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, Edit, Loader2, X, Save, ExternalLink, Eye, EyeOff, Monitor } from 'lucide-react'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import api from '@/lib/api'
 import ImageUpload from '@/components/admin/ImageUpload'
@@ -75,7 +76,13 @@ export default function BlogAdminPage() {
             <div><label className="label">Autor</label><input className="input" value={form.author} onChange={e => set('author', e.target.value)} /></div>
           </div>
           <div><label className="label">Resumo (aparece na lista e no Google)</label><textarea className="input" rows={2} value={form.excerpt} onChange={e => set('excerpt', e.target.value)} /></div>
-          <div><label className="label">Conteúdo</label><RichTextEditor value={form.content} onChange={v => set('content', v)} /></div>
+          <div>
+            <label className="label">Conteúdo</label>
+            <RichTextEditor value={form.content} onChange={v => set('content', v)} />
+            <p className="text-xs text-gray-400 mt-1">
+              Para vender dentro do texto: selecione a palavra, clique no ícone de corrente e busque o curso pelo nome — o endereço é preenchido sozinho.
+            </p>
+          </div>
           <ImageUpload value={form.cover_image} onChange={v => set('cover_image', v)} label="Imagem de capa" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -92,7 +99,16 @@ export default function BlogAdminPage() {
             <div><label className="label">Descrição SEO (até 155 caracteres)</label><textarea className="input" rows={2} value={form.seo_description} onChange={e => set('seo_description', e.target.value)} /><p className="text-xs text-gray-400 mt-1">{form.seo_description.length}/155</p></div>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.published} onChange={e => set('published', e.target.checked)} /> Publicado</label>
-          <button onClick={save} disabled={saving} className="btn-primary">{saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar</button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={save} disabled={saving} className="btn-primary">{saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar</button>
+            {form.id && (
+              <Link href={`/admin/blog/preview/${form.id}`} target="_blank"
+                className="flex items-center gap-2 text-sm font-semibold text-primary-700 hover:underline">
+                <Monitor size={16} /> Ver como vai ficar
+              </Link>
+            )}
+            {form.id && <span className="text-xs text-gray-400">Salve antes para a pré-visualização mostrar as alterações.</span>}
+          </div>
         </div>
       )}
 
@@ -106,7 +122,8 @@ export default function BlogAdminPage() {
                 <p className="font-semibold text-gray-900 truncate">{p.title}</p>
                 <p className="text-xs text-gray-400">/blog/{p.slug} · {p.published ? 'publicado' : 'rascunho'}</p>
               </div>
-              {p.published && <a href={`/blog/${p.slug}`} target="_blank" className="p-2 text-gray-400 hover:text-primary-600"><ExternalLink size={16} /></a>}
+              <Link href={`/admin/blog/preview/${p.id}`} target="_blank" title="Ver como vai ficar" className="p-2 text-gray-400 hover:text-primary-600"><Monitor size={16} /></Link>
+              {p.published && <a href={`/blog/${p.slug}`} target="_blank" title="Abrir no site" className="p-2 text-gray-400 hover:text-primary-600"><ExternalLink size={16} /></a>}
               <button onClick={() => edit(p.id)} className="p-2 text-gray-400 hover:text-primary-600"><Edit size={16} /></button>
               <button onClick={() => remove(p.id)} className="p-2 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
             </div>
