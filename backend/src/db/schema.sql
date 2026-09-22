@@ -164,6 +164,182 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- =====================================================================
+-- v2 (2026-09) – carrinho, pagamentos, busca, blog, SEO
+-- Tudo idempotente: pode rodar em todo boot sem efeito colateral.
+-- =====================================================================
+
+-- Extensões para a busca (fazem parte do contrib do postgres:16-alpine)
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- unaccent() não é IMMUTABLE; este wrapper permite usá-lo em índices
+CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text AS $$
+  SELECT public.unaccent('public.unaccent', $1)
+$$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+
+-- Pedidos: novas colunas
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_cpf VARCHAR(20);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_preference_id VARCHAR(255);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status_detail VARCHAR(100);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_error TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS access_token VARCHAR(64);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_counted BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_orders_payment_id ON orders(payment_id);
+
+-- Itens do pedido (carrinho: vários cursos por pedido)
+CREATE TABLE IF NOT EXISTS order_items (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  course_title VARCHAR(500) NOT NULL,
+  unit_price DECIMAL(10,2) NOT NULL,
+  discount DECIMAL(10,2) NOT NULL DEFAULT 0,
+  final_price DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+-- Migra pedidos antigos (1 curso por pedido) para order_items
+INSERT INTO order_items (order_id, course_id, course_title, unit_price, discount, final_price, created_at)
+SELECT o.id, o.course_id, COALESCE(c.title, 'Curso removido'), o.amount, 0, o.amount, o.created_at
+FROM orders o
+LEFT JOIN courses c ON c.id = o.course_id
+WHERE o.course_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id);
+
+-- Pedidos antigos já pagos: não recontar uso de cupom
+UPDATE orders SET coupon_counted = true WHERE status = 'paid' AND coupon_counted = false AND coupon_id IS NOT NULL;
+
+-- Busca de cursos
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS search_text TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS search_title TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS search_disciplines TEXT;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS search_tsv tsvector;
+-- versão sem radicalização: garante que prefixos como "automatizad" achem "automatizado"
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS search_tsv_simple tsvector;
+CREATE INDEX IF NOT EXISTS idx_courses_search_tsv ON courses USING GIN (search_tsv);
+CREATE INDEX IF NOT EXISTS idx_courses_search_tsv_simple ON courses USING GIN (search_tsv_simple);
+CREATE INDEX IF NOT EXISTS idx_courses_search_title_trgm ON courses USING GIN (search_title gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_courses_search_text_trgm ON courses USING GIN (search_text gin_trgm_ops);
+
+-- Sinônimos por categoria (entram no índice com peso B)
+CREATE OR REPLACE FUNCTION category_synonyms(cat text) RETURNS text AS $$
+  SELECT CASE lower(f_unaccent(coalesce(cat, '')))
+    WHEN 'eja' THEN 'eja supletivo ensino medio ensino fundamental jovens adultos terminar estudos'
+    WHEN 'pos-graduacao' THEN 'pos posgraduacao pos-graduacao especializacao mba lato sensu'
+    WHEN 'graduacao' THEN 'graduacao faculdade bacharelado licenciatura ensino superior'
+    WHEN 'superior sequencial' THEN 'superior sequencial sequencial formacao especifica ensino superior curso superior'
+    WHEN 'tecnico' THEN 'tecnico curso tecnico profissionalizante'
+    WHEN 'tecnologo' THEN 'tecnologo superior graduacao tecnologica'
+    WHEN 'livre' THEN 'livre curso livre capacitacao'
+    ELSE ''
+  END
+$$ LANGUAGE sql IMMUTABLE;
+
+-- Recalcula o documento de busca de um curso (ou de todos, se NULL)
+CREATE OR REPLACE FUNCTION refresh_course_search(cid integer) RETURNS void AS $$
+  WITH disc AS (
+    SELECT cm.course_id,
+           string_agg(DISTINCT cm.name, ' | ') AS modules,
+           string_agg(cd.name, ' | ' ORDER BY cm.order_index, cd.order_index) AS disciplines
+    FROM course_modules cm
+    LEFT JOIN course_disciplines cd ON cd.module_id = cm.id
+    WHERE cid IS NULL OR cm.course_id = cid
+    GROUP BY cm.course_id
+  )
+  UPDATE courses c SET
+    search_title = lower(f_unaccent(coalesce(c.title, ''))),
+    search_disciplines = coalesce(d.disciplines, ''),
+    search_text = lower(f_unaccent(concat_ws(' ',
+      c.title, c.category, category_synonyms(c.category), c.subtitle,
+      d.modules, d.disciplines,
+      regexp_replace(coalesce(c.description, ''), '<[^>]+>', ' ', 'g')))),
+    search_tsv =
+      setweight(to_tsvector('portuguese', f_unaccent(coalesce(c.title, ''))), 'A') ||
+      setweight(to_tsvector('portuguese', f_unaccent(coalesce(c.category, '') || ' ' || category_synonyms(c.category))), 'B') ||
+      setweight(to_tsvector('portuguese', f_unaccent(coalesce(d.modules, '') || ' ' || coalesce(d.disciplines, ''))), 'C') ||
+      setweight(to_tsvector('portuguese', f_unaccent(coalesce(c.subtitle, '') || ' ' ||
+        regexp_replace(coalesce(c.description, ''), '<[^>]+>', ' ', 'g'))), 'D'),
+    search_tsv_simple =
+      setweight(to_tsvector('simple', f_unaccent(coalesce(c.title, ''))), 'A') ||
+      setweight(to_tsvector('simple', f_unaccent(coalesce(c.category, '') || ' ' || category_synonyms(c.category))), 'B') ||
+      setweight(to_tsvector('simple', f_unaccent(coalesce(d.modules, '') || ' ' || coalesce(d.disciplines, ''))), 'C') ||
+      setweight(to_tsvector('simple', f_unaccent(coalesce(c.subtitle, '') || ' ' ||
+        regexp_replace(coalesce(c.description, ''), '<[^>]+>', ' ', 'g'))), 'D')
+  FROM (SELECT id FROM courses WHERE cid IS NULL OR id = cid) ids
+  LEFT JOIN disc d ON d.course_id = ids.id
+  WHERE c.id = ids.id
+$$ LANGUAGE sql;
+
+-- Registro das buscas (relatório no admin)
+CREATE TABLE IF NOT EXISTS search_logs (
+  id SERIAL PRIMARY KEY,
+  term VARCHAR(200) NOT NULL,
+  results INTEGER NOT NULL DEFAULT 0,
+  category VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_search_logs_created ON search_logs(created_at);
+
+-- Blog
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id SERIAL PRIMARY KEY,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  excerpt VARCHAR(600),
+  content TEXT,
+  cover_image VARCHAR(500),
+  related_category VARCHAR(100),
+  author VARCHAR(255),
+  published BOOLEAN DEFAULT false,
+  published_at TIMESTAMP,
+  seo_title VARCHAR(500),
+  seo_description VARCHAR(500),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================================================================
+-- v2.1 (2026-09) – recuperação de senha e autenticação em 2 fatores (admin)
+-- =====================================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;   -- invalida sessões antigas
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT;                             -- criptografado (TWOFA_ENCRYPTION_KEY)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_pending_secret TEXT;                     -- durante a ativação
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_last_step BIGINT;                        -- impede reutilizar o mesmo código
+ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_codes JSONB NOT NULL DEFAULT '[]';   -- hashes SHA-256
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(64) NOT NULL UNIQUE,     -- SHA-256 do token; o token em si só existe no e-mail
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  requested_ip VARCHAR(64),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+
+-- Registro de eventos de segurança (login, falhas, 2FA, recuperação)
+CREATE TABLE IF NOT EXISTS auth_events (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  email VARCHAR(255),
+  event VARCHAR(50) NOT NULL,
+  ip VARCHAR(64),
+  user_agent VARCHAR(300),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_auth_events_created ON auth_events(created_at);
+
+-- v2.2: categoria "Superior" passa a se chamar "Superior Sequencial" (item do menu Graduação)
+UPDATE courses SET category = 'Superior Sequencial' WHERE category = 'Superior';
+UPDATE blog_posts SET related_category = 'Superior Sequencial' WHERE related_category = 'Superior';
+
 -- Trigger para updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -180,5 +356,10 @@ CREATE OR REPLACE TRIGGER update_courses_updated_at
 
 CREATE OR REPLACE TRIGGER update_orders_updated_at
     BEFORE UPDATE ON orders
+    FOR EACH ROW
+    EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER update_blog_posts_updated_at
+    BEFORE UPDATE ON blog_posts
     FOR EACH ROW
     EXECUTE PROCEDURE update_updated_at_column();

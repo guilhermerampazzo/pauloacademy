@@ -15,7 +15,8 @@ interface Props {
   onSubmit: (data: unknown) => Promise<void>
 }
 
-const CATEGORIES = ['EJA', 'Pós-Graduação', 'Graduação', 'Tecnólogo', 'Superior', 'Técnico', 'Livre', 'Compliance']
+// v2.2: "Graduação" = Bacharelado no menu; "Superior" virou "Superior Sequencial"
+const CATEGORIES = ['EJA', 'Técnico', 'Graduação', 'Tecnólogo', 'Superior Sequencial', 'Pós-Graduação', 'Livre', 'Compliance']
 const MODALITIES = ['EAD', 'Semi-presencial', 'Presencial']
 
 export default function CourseForm({ initialData, onSubmit }: Props) {
@@ -156,7 +157,11 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
             </div>
             <div>
               <label className="label">Duração</label>
-              <input value={form.duration} onChange={e => set('duration', e.target.value)} className="input" placeholder="18 meses" />
+              {/* v2: sugestões no formato padrão; o backend normaliza ("6-a12-meses" -> "6 a 12 meses") */}
+              <input value={form.duration} onChange={e => set('duration', e.target.value)} className="input" placeholder="3 a 6 meses" list="duracoes-padrao" />
+              <datalist id="duracoes-padrao">
+                {['2 a 4 meses', '3 a 6 meses', '6 a 12 meses', '12 meses', '18 meses', '4 semestres', '6 semestres', '8 semestres'].map(d => <option key={d} value={d} />)}
+              </datalist>
             </div>
           </div>
           <div>
@@ -348,7 +353,8 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
 
       {/* Gatilhos de Escassez */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h2 className="font-bold text-gray-900 mb-4">Gatilhos de Urgência (opcional)</h2>
+        <h2 className="font-bold text-gray-900 mb-1">Gatilhos de Urgência (opcional)</h2>
+        <p className="text-xs text-amber-700 mb-4">Use só com dados reais: vagas da turma e data em que a condição termina. O contador some quando a data passa (não se renova mais sozinho).</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="label">Vagas Restantes</label>
@@ -403,6 +409,7 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
               {form.featured ? 'Curso em destaque' : 'Curso normal'}
             </span>
           </label>
+          <p className="text-xs text-gray-400">A home mostra até 6 cursos por categoria, com os destaques primeiro. Para o selo &quot;Destaque&quot; ter efeito, marque só os principais de cada categoria.</p>
         </div>
       </div>
 

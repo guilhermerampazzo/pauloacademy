@@ -5,7 +5,7 @@ import Sidebar from '@/components/admin/Sidebar'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  if (pathname === '/admin/login') {
+  if (['/admin/login', '/admin/esqueci-senha', '/admin/redefinir-senha'].includes(pathname)) {
     return <>{children}</>
   }
 

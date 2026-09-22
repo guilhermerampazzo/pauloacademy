@@ -18,8 +18,8 @@ router.get('/stats', requireAuth, async (req, res) => {
     })
 
     const recentOrders = await pool.query(
-      `SELECT o.*, c.title AS course_title FROM orders o
-       LEFT JOIN courses c ON c.id = o.course_id
+      `SELECT o.*, (SELECT string_agg(oi.course_title, ' + ' ORDER BY oi.id) FROM order_items oi WHERE oi.order_id = o.id) AS course_title
+       FROM orders o
        ORDER BY o.created_at DESC LIMIT 10`
     )
 

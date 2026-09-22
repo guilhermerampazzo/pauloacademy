@@ -1,10 +1,14 @@
 import type { Metadata } from 'next'
 import { ChevronDown } from 'lucide-react'
-import Header from '@/components/public/Header'
-import Footer from '@/components/public/Footer'
+import { SiteHeader, SiteFooter } from '@/components/public/Site'
+import WhatsAppButton from '@/components/public/WhatsAppButton'
+import JsonLd from '@/components/JsonLd'
+import { faqSchema } from '@/lib/schema'
 
 export const metadata: Metadata = {
-  title: 'Perguntas Frequentes | Academy Pop',
+  title: 'Perguntas frequentes',
+  description: 'Respostas sobre matrícula, pagamento, certificado e reconhecimento dos cursos EAD da Academy Pop.',
+  alternates: { canonical: '/perguntas-frequentes' },
 }
 
 async function getContent() {
@@ -23,7 +27,7 @@ export default async function FaqPage() {
 
   return (
     <>
-      <Header socialData={footer as Parameters<typeof Header>[0]['socialData']} />
+      <SiteHeader />
 
       <section className="bg-gradient-to-br from-primary-900 to-primary-800 text-white py-20">
         <div className="max-w-3xl mx-auto px-4 text-center">
@@ -36,7 +40,7 @@ export default async function FaqPage() {
         <div className="max-w-3xl mx-auto px-4">
           {items.length === 0 ? (
             <p className="text-center text-gray-400 py-16">
-              Nenhuma pergunta cadastrada ainda. Acesse o painel administrativo, em Conteúdo, seção FAQ Geral.
+              Em breve. Enquanto isso, tire suas dúvidas pelo WhatsApp.
             </p>
           ) : (
             <div className="space-y-3">
@@ -56,7 +60,9 @@ export default async function FaqPage() {
         </div>
       </section>
 
-      <Footer data={footer as Parameters<typeof Footer>[0]['data']} />
+      {faqSchema(items) && <JsonLd data={faqSchema(items)!} />}
+      <SiteFooter />
+      <WhatsAppButton number={String(footer.whatsapp || '')} context="as perguntas frequentes" />
     </>
   )
 }

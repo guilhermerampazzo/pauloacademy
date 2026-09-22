@@ -2,61 +2,41 @@
 import { useEffect, useState } from 'react'
 import { Timer } from 'lucide-react'
 
-const RENEW_MS = 24 * 60 * 60 * 1000 // ciclo de renovação da oferta quando o prazo expira
-
+// Antes: quando a data expirava, o contador se renovava sozinho (urgência falsa,
+// risco perante o CDC art. 37). Agora: mostra o tempo até a data real da oferta
+// e some quando ela termina.
 export default function CountdownTimer({ expiresAt }: { expiresAt: string }) {
-  const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0, expired: false, loaded: false })
+  const [left, setLeft] = useState<number | null>(null)
 
   useEffect(() => {
-    const update = () => {
-      let target = new Date(expiresAt).getTime()
-      let diff = target - Date.now()
-      while (diff <= 0) {
-        target += RENEW_MS
-        diff = target - Date.now()
-      }
-      const d = Math.floor(diff / 86_400_000)
-      const h = Math.floor((diff % 86_400_000) / 3_600_000)
-      const m = Math.floor((diff % 3_600_000) / 60_000)
-      const s = Math.floor((diff % 60_000) / 1_000)
-      setTime({ d, h, m, s, expired: false, loaded: true })
-    }
+    const target = new Date(expiresAt).getTime()
+    const update = () => setLeft(target - Date.now())
     update()
     const id = setInterval(update, 1000)
     return () => clearInterval(id)
   }, [expiresAt])
 
-  if (!time.loaded) return null
+  if (left === null || left <= 0 || Number.isNaN(left)) return null
 
+  const d = Math.floor(left / 86_400_000)
+  const h = Math.floor((left % 86_400_000) / 3_600_000)
+  const m = Math.floor((left % 3_600_000) / 60_000)
+  const s = Math.floor((left % 60_000) / 1_000)
   const pad = (n: number) => String(n).padStart(2, '0')
-
-  if (time.expired) {
-    return (
-      <div className="flex items-center gap-2 text-red-600 font-bold text-base">
-        <Timer size={20} />
-        <span>Oferta encerrada</span>
-      </div>
-    )
-  }
+  const date = new Date(expiresAt).toLocaleDateString('pt-BR')
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-accent-700 font-bold text-sm uppercase tracking-wide">
-        <Timer size={18} className="animate-pulse" />
-        <span>Oferta por tempo limitado!</span>
-      </div>
-      <div className="flex items-center gap-2 font-mono font-black text-2xl text-accent-800">
-        {time.d > 0 && (
-          <>
-            <span className="bg-accent-100 border border-accent-300 text-accent-800 px-3 py-1.5 rounded-lg min-w-[3rem] text-center">{pad(time.d)}</span>
-            <span className="text-accent-500">d</span>
-          </>
-        )}
-        <span className="bg-accent-100 border border-accent-300 text-accent-800 px-3 py-1.5 rounded-lg min-w-[3rem] text-center">{pad(time.h)}</span>
-        <span className="text-accent-500 text-xl">:</span>
-        <span className="bg-accent-100 border border-accent-300 text-accent-800 px-3 py-1.5 rounded-lg min-w-[3rem] text-center">{pad(time.m)}</span>
-        <span className="text-accent-500 text-xl">:</span>
-        <span className="bg-accent-100 border border-accent-300 text-accent-800 px-3 py-1.5 rounded-lg min-w-[3rem] text-center">{pad(time.s)}</span>
+    <div>
+      <p className="flex items-center gap-2 text-accent-200 text-sm font-semibold mb-2">
+        <Timer size={16} /> Condição válida até {date}
+      </p>
+      <div className="flex gap-2">
+        {[{ v: d, l: 'dias' }, { v: h, l: 'horas' }, { v: m, l: 'min' }, { v: s, l: 'seg' }].map(x => (
+          <div key={x.l} className="bg-white/10 rounded-lg px-3 py-2 text-center min-w-[56px]">
+            <div className="text-2xl font-black tabular-nums">{pad(x.v)}</div>
+            <div className="text-[10px] uppercase tracking-wide text-blue-200">{x.l}</div>
+          </div>
+        ))}
       </div>
     </div>
   )

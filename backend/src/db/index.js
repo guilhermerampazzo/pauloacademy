@@ -85,6 +85,60 @@ async function seedContent() {
     }
   ]
 
+  // v2: páginas institucionais editáveis no CMS (só são criadas se não existirem)
+  sections.push(
+    {
+      key: 'como_funciona',
+      title: 'Página Como Funciona',
+      data: {
+        title: 'Como funciona estudar na Academy Pop',
+        intro: 'Do primeiro contato ao certificado, você tem acompanhamento em cada etapa. Tudo 100% online, no seu ritmo.',
+        steps: [
+          { title: 'Escolha o curso', text: 'Encontre o curso ideal pela busca ou fale com um consultor pelo WhatsApp para tirar dúvidas.' },
+          { title: 'Faça a matrícula', text: 'Pague por PIX, boleto ou cartão em até 12x. A matrícula é confirmada assim que o pagamento é aprovado.' },
+          { title: 'Receba o acesso', text: 'Você recebe os dados de acesso à plataforma de estudos e começa quando quiser.' },
+          { title: 'Estude no seu ritmo', text: 'Aulas, materiais e avaliações online, com suporte da nossa equipe sempre que precisar.' },
+          { title: 'Receba o certificado', text: 'Concluídas as etapas, o certificado é emitido pela instituição certificadora.' },
+        ],
+        video_url: '',
+        images: [],
+      },
+    },
+    {
+      key: 'reconhecimento',
+      title: 'Página Reconhecimento MEC',
+      data: {
+        title: 'Reconhecimento e instituições certificadoras',
+        intro: 'A Academy Pop é polo parceiro de instituições credenciadas. Nesta página você confere quem certifica cada tipo de curso e como verificar a regularidade no e-MEC.',
+        institutions: [],
+        how_to_verify: [
+          'Acesse emec.mec.gov.br',
+          'Clique em "Consulta Avançada" e pesquise pelo nome da instituição',
+          'Confira a situação do credenciamento e dos cursos',
+        ],
+        diploma_image: '',
+      },
+    },
+    {
+      key: 'privacidade',
+      title: 'Política de Privacidade',
+      data: {
+        title: 'Política de Privacidade',
+        updated_at: new Date().toISOString().slice(0, 10),
+        html: '<p>Esta política explica como a Academy Pop trata os dados pessoais de quem visita o site e de quem se matricula em nossos cursos, em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).</p><h2>Dados que coletamos</h2><ul><li>Dados informados por você na matrícula ou no contato: nome, e-mail, telefone/WhatsApp e, quando necessário para o pagamento, CPF.</li><li>Dados de navegação: páginas visitadas, termos pesquisados no site e informações técnicas do dispositivo, coletados por cookies e ferramentas de análise.</li></ul><h2>Para que usamos</h2><ul><li>Processar a matrícula e o pagamento.</li><li>Entrar em contato sobre o seu pedido e o seu curso.</li><li>Enviar informações sobre cursos, quando você autorizar.</li><li>Melhorar o site e medir o desempenho das nossas campanhas.</li></ul><h2>Com quem compartilhamos</h2><p>Com a instituição certificadora do curso escolhido, com o processador de pagamentos (Mercado Pago) e com ferramentas de análise (como Google Analytics e Meta), apenas no necessário para as finalidades acima. Não vendemos dados pessoais.</p><h2>Seus direitos</h2><p>Você pode pedir acesso, correção, portabilidade ou exclusão dos seus dados, e revogar consentimentos, pelos contatos informados no rodapé do site.</p><h2>Segurança e retenção</h2><p>Adotamos medidas técnicas para proteger os dados e os mantemos pelo tempo necessário para cumprir as finalidades e as obrigações legais.</p>',
+      },
+    },
+    {
+      key: 'termos',
+      title: 'Termos de Uso',
+      data: {
+        title: 'Termos de Uso',
+        updated_at: new Date().toISOString().slice(0, 10),
+        html: '<p>Ao usar este site e contratar um curso, você concorda com os termos abaixo.</p><h2>Matrícula</h2><p>A matrícula é confirmada após a aprovação do pagamento. Os dados informados devem ser verdadeiros e completos, pois serão usados na emissão de documentos acadêmicos.</p><h2>Preços e pagamento</h2><p>Os preços exibidos valem para a data da contratação. Pagamentos são processados pelo Mercado Pago por PIX, boleto ou cartão de crédito.</p><h2>Direito de arrependimento</h2><p>Nas compras pela internet, você pode desistir em até 7 dias da contratação, conforme o art. 49 do Código de Defesa do Consumidor, pelos contatos informados no rodapé.</p><h2>Certificação</h2><p>A certificação é emitida pela instituição credenciada responsável pelo curso, após o cumprimento dos requisitos acadêmicos.</p><h2>Contato</h2><p>Dúvidas sobre estes termos podem ser enviadas pelos canais informados no rodapé.</p>',
+      },
+    }
+  )
+
   for (const section of sections) {
     const { rows } = await pool.query('SELECT id FROM content_sections WHERE key = $1', [section.key])
     if (rows.length === 0) {

@@ -13,6 +13,30 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Depoimentos públicos (home e páginas de categoria)
+// ?course_id=  -> só daquele curso; ?category= -> de cursos da categoria; sem nada -> todos ativos
+router.get('/testimonials/public', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 6, 30)
+    const params = [limit]
+    let where = 't.active = true'
+    if (req.query.category) {
+      params.push(req.query.category)
+      where += ` AND c.category = $${params.length}`
+    }
+    const { rows } = await pool.query(
+      `SELECT t.id, t.name, t.role, t.content, t.photo, c.title AS course_title, c.slug AS course_slug, c.category
+       FROM testimonials t LEFT JOIN courses c ON c.id = t.course_id
+       WHERE ${where} ORDER BY t.order_index, t.created_at DESC LIMIT $1`,
+      params
+    )
+    res.set('Cache-Control', 'public, max-age=120')
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar depoimentos' })
+  }
+})
+
 router.get('/:key', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM content_sections WHERE key = $1', [req.params.key])

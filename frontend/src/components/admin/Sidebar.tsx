@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, BookOpen, Users, FileText, Tag, ShoppingBag, LogOut, GraduationCap, Settings
+  LayoutDashboard, BookOpen, Users, FileText, Tag, ShoppingBag, LogOut, GraduationCap, Settings, MessageSquareQuote, Newspaper, Search, KeyRound
 } from 'lucide-react'
 import { removeToken } from '@/lib/auth'
 import clsx from 'clsx'
@@ -12,8 +12,12 @@ const links = [
   { href: '/admin/cursos', label: 'Cursos', icon: BookOpen },
   { href: '/admin/professores', label: 'Professores', icon: Users },
   { href: '/admin/conteudo', label: 'Conteúdo', icon: FileText },
+  { href: '/admin/depoimentos', label: 'Depoimentos', icon: MessageSquareQuote },
+  { href: '/admin/blog', label: 'Blog', icon: Newspaper },
   { href: '/admin/cupons', label: 'Cupons', icon: Tag },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
+  { href: '/admin/buscas', label: 'Buscas no site', icon: Search },
+  { href: '/admin/senha', label: 'Segurança da conta', icon: KeyRound },
 ]
 
 export default function Sidebar() {

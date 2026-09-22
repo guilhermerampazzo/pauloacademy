@@ -2,27 +2,76 @@ const router = require('express').Router()
 const { pool } = require('../db')
 const { requireAuth } = require('../middleware/auth')
 const slugify = require('slugify')
+const { normalizeDuration } = require('../lib/duration')
+
+const refreshSearch = id => pool.query('SELECT refresh_course_search($1)', [id]).catch(e => console.error('refresh_course_search', e.message))
 
 // Listar cursos públicos (ativos)
+// Parâmetros opcionais:
+//   category=Pós-Graduação   -> só a categoria
+//   per_category=6           -> no máximo N por categoria (destaques primeiro) – usado na home
+//   limit=12                 -> limite total
+const LIST_FIELDS = `id, slug, title, subtitle, cover_image, workload, modality, duration, category,
+                     price_pix, price_installment, installments, installment_value,
+                     price_original, discount_percent,
+                     active, featured, vacancy_count, offer_expires_at, updated_at`
+
 router.get('/', async (req, res) => {
   try {
     const { category } = req.query
-    let query = `SELECT id, slug, title, subtitle, cover_image, workload, modality, duration, category,
-                        price_pix, price_installment, installments, installment_value,
-                        price_original, discount_percent,
-                        active, featured, vacancy_count, offer_expires_at
-                 FROM courses WHERE active = true`
+    const perCategory = Math.min(parseInt(req.query.per_category) || 0, 50)
+    const limit = Math.min(parseInt(req.query.limit) || 0, 500)
     const params = []
+    let where = 'active = true'
     if (category) {
       params.push(category)
-      query += ` AND category = $${params.length}`
+      where += ` AND category = $${params.length}`
     }
-    query += ' ORDER BY featured DESC, created_at DESC'
+    let query
+    if (perCategory > 0) {
+      params.push(perCategory)
+      query = `SELECT ${LIST_FIELDS} FROM (
+                 SELECT *, ROW_NUMBER() OVER (PARTITION BY category ORDER BY featured DESC, created_at DESC) AS rn
+                 FROM courses WHERE ${where}
+               ) t WHERE rn <= $${params.length}
+               ORDER BY category, featured DESC, created_at DESC`
+    } else {
+      query = `SELECT ${LIST_FIELDS} FROM courses WHERE ${where} ORDER BY featured DESC, created_at DESC`
+    }
+    if (limit > 0) {
+      params.push(limit)
+      query += ` LIMIT $${params.length}`
+    }
     const { rows } = await pool.query(query, params)
     res.json(rows)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao buscar cursos' })
+  }
+})
+
+// Categorias com contagem de cursos ativos (menu, páginas de categoria, filtros)
+router.get('/categories', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT category, COUNT(*)::int AS count, MIN(price_pix) FILTER (WHERE price_pix > 0) AS min_price
+       FROM courses WHERE active = true GROUP BY category ORDER BY COUNT(*) DESC`
+    )
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar categorias' })
+  }
+})
+
+// Lista enxuta para o sitemap.xml
+router.get('/sitemap', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT slug, category, updated_at FROM courses WHERE active = true ORDER BY updated_at DESC'
+    )
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ error: 'Erro' })
   }
 })
 
@@ -85,6 +134,18 @@ router.get('/slug/:slug', async (req, res) => {
       [course.id]
     )
     course.faqs = faqs
+
+    // Cursos relacionados (mesma categoria) – link interno para SEO
+    const { rows: related } = await pool.query(
+      `SELECT ${LIST_FIELDS} FROM courses
+       WHERE active = true AND category = $1 AND id <> $2
+       ORDER BY featured DESC, created_at DESC LIMIT 3`,
+      [course.category, course.id]
+    )
+    course.related = related
+
+    // Campos internos da busca não vão para o site
+    delete course.search_text; delete course.search_tsv; delete course.search_tsv_simple; delete course.search_title; delete course.search_disciplines
 
     res.json(course)
   } catch (err) {
@@ -158,7 +219,7 @@ router.post('/', requireAuth, async (req, res) => {
                             price_original, discount_percent,
                             active, featured, vacancy_count, offer_expires_at, whatsapp_message, seo_title, seo_description)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING *`,
-      [slug, title, subtitle, description, cover_image, workload, modality, duration, category,
+      [slug, title, subtitle, description, cover_image, workload, modality, normalizeDuration(duration), category,
        price_pix, price_installment, installments, installment_value,
        price_original || 0, discount_percent || 0,
        active ?? true, featured ?? false, vacancy_count, offer_expires_at || null, whatsapp_message, seo_title, seo_description]
@@ -179,6 +240,7 @@ router.post('/', requireAuth, async (req, res) => {
     if (faqs?.length) {
       await saveFaqs(course.id, faqs)
     }
+    await refreshSearch(course.id)
 
     res.status(201).json(course)
   } catch (err) {
@@ -209,7 +271,7 @@ router.put('/:id', requireAuth, async (req, res) => {
                           active=$15, featured=$16, vacancy_count=$17,
                           offer_expires_at=$18, whatsapp_message=$19, seo_title=$20, seo_description=$21
        WHERE id=$22`,
-      [title, subtitle, description, cover_image, workload, modality, duration, category,
+      [title, subtitle, description, cover_image, workload, modality, normalizeDuration(duration), category,
        price_pix, price_installment, installments, installment_value,
        price_original || 0, discount_percent || 0,
        active, featured, vacancy_count, offer_expires_at || null, whatsapp_message, seo_title, seo_description,
@@ -237,6 +299,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     // FAQs
     await pool.query('DELETE FROM course_faqs WHERE course_id = $1', [id])
     if (faqs?.length) await saveFaqs(id, faqs)
+    await refreshSearch(id)
 
     const { rows } = await pool.query('SELECT * FROM courses WHERE id = $1', [id])
     res.json(rows[0])

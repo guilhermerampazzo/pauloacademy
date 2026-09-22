@@ -25,7 +25,8 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('admin_token')
-      if (window.location.pathname.startsWith('/admin') && window.location.pathname !== '/admin/login') {
+      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      if (window.location.pathname.startsWith('/admin') && !['/admin/login', '/admin/esqueci-senha', '/admin/redefinir-senha'].includes(window.location.pathname)) {
         window.location.href = '/admin/login'
       }
     }

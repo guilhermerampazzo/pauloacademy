@@ -33,7 +33,8 @@ export default function PedidosPage() {
     const matchSearch = !search ||
       o.customer_name.toLowerCase().includes(search.toLowerCase()) ||
       o.customer_email.toLowerCase().includes(search.toLowerCase()) ||
-      o.course_title?.toLowerCase().includes(search.toLowerCase())
+      o.course_title?.toLowerCase().includes(search.toLowerCase()) ||
+      String(o.id) === search.replace('#', '')
     const matchStatus = !statusFilter || o.status === statusFilter
     return matchSearch && matchStatus
   })
@@ -110,11 +111,27 @@ export default function PedidosPage() {
                         <p className="text-gray-400 text-xs">{order.customer_email}</p>
                         {order.customer_phone && <p className="text-gray-400 text-xs">{order.customer_phone}</p>}
                       </td>
-                      <td className="px-4 py-4 text-gray-600 text-xs max-w-[180px] truncate">{order.course_title}</td>
+                      <td className="px-4 py-4 text-gray-600 text-xs max-w-[240px]">
+                        {order.items && order.items.length > 0 ? (
+                          <ul className="space-y-0.5">
+                            {order.items.map((it, i) => (
+                              <li key={i} className="truncate" title={it.course_title}>
+                                {order.items!.length > 1 && '• '}{it.course_title}
+                                {Number(it.discount) > 0 && <span className="text-green-600"> (−{Number(it.discount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : order.course_title}
+                        {order.coupon_code && <p className="text-[11px] text-primary-600 mt-1">Cupom {order.coupon_code}</p>}
+                      </td>
                       <td className="px-4 py-4 font-semibold text-gray-900">
                         {Number(order.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
-                      <td className="px-4 py-4 text-gray-500 text-xs capitalize">{order.payment_method}</td>
+                      <td className="px-4 py-4 text-gray-500 text-xs">
+                        <span className="capitalize">{order.payment_method === 'credit_card' ? 'cartão' : order.payment_method}</span>
+                        {order.payment_status_detail && <p className="text-[11px] text-gray-400">MP: {order.payment_status_detail}</p>}
+                        {order.payment_error && <p className="text-[11px] text-red-500 max-w-[160px]" title={order.payment_error}>Erro MP: {order.payment_error.slice(0, 60)}</p>}
+                      </td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex items-center gap-1 ${s.cls} badge`}>{s.icon} {s.label}</span>
                       </td>

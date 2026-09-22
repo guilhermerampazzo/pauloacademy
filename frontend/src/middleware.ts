@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
+const PUBLIC_ADMIN = ['/admin/login', '/admin/esqueci-senha', '/admin/redefinir-senha']
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (pathname === '/admin/login') return NextResponse.next()
+  // v2.1: páginas públicas do admin (login, esqueci a senha, redefinir senha)
+  if (PUBLIC_ADMIN.includes(pathname)) return NextResponse.next()
 
   if (pathname.startsWith('/admin')) {
     const token = request.headers.get('x-admin-token') || request.cookies.get('admin_token')?.value

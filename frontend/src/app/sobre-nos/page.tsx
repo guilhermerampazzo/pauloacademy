@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { Target, Eye, Heart } from 'lucide-react'
-import Header from '@/components/public/Header'
-import Footer from '@/components/public/Footer'
+import { SiteHeader, SiteFooter } from '@/components/public/Site'
+import WhatsAppButton from '@/components/public/WhatsAppButton'
 
 export const metadata: Metadata = {
-  title: 'Sobre Nós | Academy Pop',
+  title: 'Sobre nós',
+  description: 'Conheça a Academy Pop: polo oficial de instituições certificadoras, com cursos EAD reconhecidos e atendimento humanizado desde 2019.',
+  alternates: { canonical: '/sobre-nos' },
 }
 
 async function getContent() {
@@ -23,7 +25,7 @@ export default async function SobreNosPage() {
 
   return (
     <>
-      <Header socialData={footer as Parameters<typeof Header>[0]['socialData']} />
+      <SiteHeader />
 
       <section className="bg-gradient-to-br from-primary-900 to-primary-800 text-white py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -104,7 +106,8 @@ export default async function SobreNosPage() {
         </section>
       )}
 
-      <Footer data={footer as Parameters<typeof Footer>[0]['data']} />
+      <SiteFooter />
+      <WhatsAppButton number={String(footer.whatsapp || '')} context="a página Sobre nós" />
     </>
   )
 }

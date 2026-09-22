@@ -22,6 +22,8 @@ services:
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost}
       - NEXT_PUBLIC_WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER:-5511999999999}
       - NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY=${NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY:-}
+      # v2: URL pública usada em canonical, Open Graph, sitemap e Schema.org
+      - SITE_URL=${APP_URL:-https://academypopeduca.com.br}
       - NODE_ENV=production
     depends_on:
       - backend
@@ -43,6 +45,19 @@ services:
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
       - MINIO_BUCKET=${MINIO_BUCKET:-academy-uploads}
       - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
+      # v2: assinatura do webhook, URL pública (retorno do cartão e webhook), CORS e WhatsApp
+      - MERCADOPAGO_WEBHOOK_SECRET=${MERCADOPAGO_WEBHOOK_SECRET:-}
+      - APP_URL=${APP_URL:-https://academypopeduca.com.br}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - WHATSAPP_NUMBER=${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
+      # v2.1: recuperação de senha por e-mail e 2FA
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - TWOFA_ENCRYPTION_KEY=${TWOFA_ENCRYPTION_KEY:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@paulopop.com.br}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@2024}
       - ADMIN_NAME=${ADMIN_NAME:-Paulo Pop}

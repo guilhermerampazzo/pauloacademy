@@ -35,6 +35,7 @@ export interface Course {
   testimonials?: Testimonial[]
   extra_sections?: ExtraSection[]
   faqs?: CourseFaq[]
+  related?: Course[]
   created_at: string
   updated_at: string
 }
@@ -87,6 +88,14 @@ export interface Coupon {
   created_at: string
 }
 
+export interface OrderItem {
+  course_id: number | null
+  course_title: string
+  unit_price: number | string
+  discount: number | string
+  final_price: number | string
+}
+
 export interface Order {
   id: number
   course_id: number
@@ -102,6 +111,11 @@ export interface Order {
   payment_url: string
   status: 'pending' | 'paid' | 'failed' | 'refunded'
   created_at: string
+  items?: OrderItem[]
+  customer_cpf?: string
+  payment_error?: string | null
+  payment_status_detail?: string | null
+  paid_at?: string | null
 }
 
 export interface ContentSection {

@@ -16,8 +16,7 @@ docker-compose up -d --build
 ### 3. Acesse
 - **Site público**: http://localhost (ou a porta definida em EXTERNAL_PORT)
 - **Admin**: http://localhost/admin
-  - Login: `admin@paulopop.com.br`
-  - Senha: `Admin@2024`
+  - Login e senha: os definidos em `ADMIN_EMAIL` / `ADMIN_PASSWORD` no `.env` (usados só na criação do primeiro admin)
 
 ---
 
@@ -53,9 +52,11 @@ paulo2/
 | Variável              | Padrão               | Descrição                     |
 |----------------------|---------------------|-------------------------------|
 | EXTERNAL_PORT        | 80                  | Porta exposta ao mundo        |
-| ADMIN_EMAIL          | admin@paulopop.com.br | E-mail do admin             |
-| ADMIN_PASSWORD       | Admin@2024          | Senha do admin                |
-| JWT_SECRET           | (gere um seguro)    | Chave JWT                     |
+| ADMIN_EMAIL          | (defina)            | E-mail do admin               |
+| ADMIN_PASSWORD       | (defina, forte)     | Senha do admin (1º boot)      |
+| JWT_SECRET           | `openssl rand -hex 32` | Chave JWT (obrigatória)    |
+| APP_URL              | https://academypopeduca.com.br | URL pública (SEO, webhook, retorno do cartão) |
+| MERCADOPAGO_WEBHOOK_SECRET | (vazio)       | Assinatura secreta do webhook do MP |
 | MERCADOPAGO_ACCESS_TOKEN | (vazio)         | Token MP para pagamentos reais|
 
 ## Módulos do CMS Admin
@@ -69,9 +70,17 @@ paulo2/
 ## Pagamentos
 
 O sistema suporta Mercado Pago. Para ativar:
-1. Adicione `MERCADOPAGO_ACCESS_TOKEN=seu_token` no `.env`
-2. Configure o webhook: `POST /api/orders/webhook/mercadopago`
+1. Adicione `MERCADOPAGO_ACCESS_TOKEN=seu_token` e `APP_URL=https://seu-dominio` no `.env`
+2. No painel do MP, cadastre o webhook `https://seu-dominio/api/orders/webhook/mercadopago` (evento: Pagamentos) e copie a assinatura secreta para `MERCADOPAGO_WEBHOOK_SECRET`
 3. Sem o token, o checkout redireciona para WhatsApp
+
+## Acesso ao painel (v2.1)
+
+- **Esqueci minha senha:** link por e-mail (configure `SMTP_*` no `.env`).
+- **Verificação em 2 etapas:** Admin > Segurança da conta (defina `TWOFA_ENCRYPTION_KEY` antes).
+- **Recuperação pelo servidor:** `docker compose exec backend node src/cli/admin-recovery.js` (`list`, `reset-link`, `temp-password`, `disable-2fa`).
+
+Veja `ALTERACOES.md` para a lista completa de mudanças das versões 2, 2.1 e 2.2.
 
 ## Dados iniciais (seed)
 
@@ -81,4 +90,5 @@ Ao primeiro boot, são criados automaticamente:
 - Pós-Graduação em Compliance
 - Professores de exemplo
 - Cupom EJA10 (10% de desconto)
+- Páginas institucionais: Como funciona, Reconhecimento, Privacidade, Termos (editáveis em Conteúdo)
 - Conteúdo das seções (hero, benefícios, sobre, rodapé)

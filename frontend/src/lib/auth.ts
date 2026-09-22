@@ -16,3 +16,10 @@ export function removeToken() {
 export function isAuthenticated(): boolean {
   return !!getToken()
 }
+
+// v2.1: grava a sessão (localStorage para a API + cookie para o middleware do Next)
+export function saveSession(token: string) {
+  setToken(token)
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : ''
+  document.cookie = `admin_token=${token}; path=/; max-age=${7 * 24 * 3600}; samesite=strict${secure}`
+}

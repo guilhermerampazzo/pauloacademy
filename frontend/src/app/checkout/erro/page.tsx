@@ -12,7 +12,7 @@ async function getWhatsApp() {
 }
 
 export default async function ErroPage() {
-  const whatsapp = await getWhatsApp() || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '5511999999999'
+  const whatsapp = await getWhatsApp() || process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || ''
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
