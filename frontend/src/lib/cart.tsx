@@ -101,6 +101,8 @@ export interface Quote {
   coupon: { id: number; code: string; discount_percent: number } | null
   couponError: string | null
   maxInstallments: number
+  /** v2.4: parcelado sem cartão (TMB) – disponível só para 1 curso, sem cupom */
+  tmb?: { available: boolean; reason?: string | null; max_parcelas?: number | null; simulacao?: import('./pricing').TmbSimulacao }
 }
 
 export async function fetchQuote(courseIds: number[], couponCode?: string, paymentMethod = 'pix'): Promise<Quote> {

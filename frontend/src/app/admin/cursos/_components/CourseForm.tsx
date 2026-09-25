@@ -9,14 +9,21 @@ import RichTextEditor from '@/components/admin/RichTextEditor'
 import CurriculumEditor, { type CurriculumModule } from '@/components/admin/CurriculumEditor'
 import api from '@/lib/api'
 import type { Course, Professor, ExtraSection, CourseFaq } from '@/types'
+import { MENU_CATEGORY_NAMES, menuLabel } from '@/lib/categories'
+import { installmentHasInterest } from '@/lib/pricing'
 
 interface Props {
   initialData?: Partial<Course>
   onSubmit: (data: unknown) => Promise<void>
 }
 
-// v2.2: "Graduação" = Bacharelado no menu; "Superior" virou "Superior Sequencial"
-const CATEGORIES = ['EJA', 'Técnico', 'Graduação', 'Tecnólogo', 'Superior Sequencial', 'Pós-Graduação', 'Livre', 'Compliance']
+// v2.4: categorias na ordem do menu retrátil (src/lib/categories.ts).
+// "Graduação" = Bacharelado no menu; "Livre" = Cursos Livres.
+const CATEGORIES = [...MENU_CATEGORY_NAMES, 'Compliance']
+const catLabel = (name: string) => {
+  const l = menuLabel(name)
+  return l !== name ? `${name} (${l})` : name
+}
 const MODALITIES = ['EAD', 'Semi-presencial', 'Presencial']
 
 export default function CourseForm({ initialData, onSubmit }: Props) {
@@ -32,7 +39,7 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
     workload: initialData?.workload || '',
     modality: initialData?.modality || 'EAD',
     duration: initialData?.duration || '',
-    category: initialData?.category || 'EJA',
+    category: initialData?.category || 'EJA Ensino Médio',
     price_pix: initialData?.price_pix || '',
     price_installment: initialData?.price_installment || '',
     installments: initialData?.installments || 12,
@@ -142,7 +149,9 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
             <div>
               <label className="label">Categoria</label>
               <select value={form.category} onChange={e => set('category', e.target.value)} className="input">
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                {/* categoria antiga que não está mais no menu (ex.: "EJA") continua aparecendo para não se perder */}
+                {form.category && !CATEGORIES.includes(form.category) && <option value={form.category}>{form.category} (antiga)</option>}
+                {CATEGORIES.map(c => <option key={c} value={c}>{catLabel(c)}</option>)}
               </select>
             </div>
             <div>
@@ -274,8 +283,15 @@ export default function CourseForm({ initialData, onSubmit }: Props) {
             </div>
           </div>
         </div>
+        {installmentHasInterest({ price_pix: form.price_pix, installments: form.installments, installment_value: form.installment_value, price_installment: form.price_installment }) && (
+          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+            O total parcelado ({form.installments}x de R$ {String(form.installment_value)}) é maior que o preço à vista.
+            Não escreva &quot;sem juros&quot; nos textos deste curso. Se escrever, o site retira a expressão automaticamente.
+            Para anunciar &quot;sem juros&quot;, deixe o preço parcelado igual ao PIX e clique na calculadora.
+          </p>
+        )}
         <p className="text-xs text-gray-400 mt-2">
-          Aceita PIX, cartão de crédito e boleto bancário via Mercado Pago.
+          Aceita PIX, cartão de crédito e boleto bancário via Mercado Pago. O parcelado sem cartão (TMB) é configurado em Pagamentos TMB.
         </p>
       </div>
 

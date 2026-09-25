@@ -29,10 +29,11 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   book: <BookOpen size={20} />,
 }
 
-const PER_CATEGORY = 6
+// v2.4: 3 cursos por categoria (uma linha no computador). Antes eram 6: 451 KB de HTML na home.
+const PER_CATEGORY = 3
 
 export default async function HomePage() {
-  // v2: a home carrega no máximo 6 cursos por categoria (antes: os 201 cursos,
+  // v2: a home carrega no máximo PER_CATEGORY cursos por categoria (antes: os 201 cursos,
   // 1,7 MB de HTML). O restante fica nas páginas de categoria e em /cursos.
   const [courses, content, categories, testimonials, posts] = await Promise.all([
     getCourses({ per_category: PER_CATEGORY }),

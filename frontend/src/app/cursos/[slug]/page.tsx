@@ -17,16 +17,33 @@ import CourseCard from '@/components/public/CourseCard'
 import TrackView from '@/components/public/TrackView'
 import RecordRecent from '@/components/public/RecordRecent'
 import JsonLd from '@/components/JsonLd'
-import { getContent, getCourse, getTestimonials } from '@/lib/data'
+import { getContent, getCourse, getTestimonials, getTmbPublic } from '@/lib/data'
+import { honestText, installmentHasInterest, tmbSimulate } from '@/lib/pricing'
+import TmbTable from '@/components/public/TmbTable'
+import type { Course } from '@/types'
 import { getCategoryInfo, categoryHref } from '@/lib/categories'
 import { courseSchema, faqSchema } from '@/lib/schema'
 import { brl, stripHtml, whatsappLink } from '@/lib/site'
 
 export const revalidate = 60
 
+// v2.4: tira "sem juros" dos textos quando o parcelado soma mais que o PIX
+function sanitize<T extends Course>(c: T): T {
+  return {
+    ...c,
+    subtitle: honestText(c.subtitle, c),
+    description: honestText(c.description, c),
+    seo_title: honestText(c.seo_title, c),
+    seo_description: honestText(c.seo_description, c),
+    extra_sections: (c.extra_sections || []).map(s => ({ ...s, title: honestText(s.title, c), content: honestText(s.content, c) })),
+    faqs: (c.faqs || []).map(f => ({ ...f, question: honestText(f.question, c), answer: honestText(f.answer, c) })),
+  }
+}
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const course = await getCourse(params.slug)
-  if (!course) return { title: 'Curso não encontrado', robots: { index: false } }
+  const raw = await getCourse(params.slug)
+  if (!raw) return { title: 'Curso não encontrado', robots: { index: false } }
+  const course = sanitize(raw)
   const title = course.seo_title || course.title
   const description = course.seo_description || course.subtitle || stripHtml(course.description, 158)
   const path = `/cursos/${course.slug}`
@@ -46,8 +63,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function CoursePage({ params }: { params: { slug: string } }) {
-  const [course, content] = await Promise.all([getCourse(params.slug), getContent()])
-  if (!course) notFound()
+  const [raw, content, tmb] = await Promise.all([getCourse(params.slug), getContent(), getTmbPublic()])
+  if (!raw) notFound()
+  const course = sanitize(raw)
 
   const footer = (content.footer || {}) as Record<string, string>
   const pricePix = Number(course.price_pix || 0)
@@ -58,6 +76,13 @@ export default async function CoursePage({ params }: { params: { slug: string } 
   const whatsappHref = whatsappLink(whatsappNumber, course.whatsapp_message || `Olá! Tenho interesse no curso ${course.title}.`)
   const cat = getCategoryInfo(course.category)
   const offerActive = !!course.offer_expires_at && new Date(course.offer_expires_at).getTime() > Date.now()
+  // v2.4: parcelado sem cartão (TMB) disponível para esta categoria e preço
+  const tmbCat = tmb.enabled ? tmb.categories?.[course.category] : undefined
+  const tmbAvailable = !!tmbCat && pricePix >= (tmb.min_value || 144)
+  const checkoutHref = `/checkout?curso=${course.id}`
+  const tmbSim = tmbAvailable && tmbCat ? tmbSimulate(tmbCat, pricePix) : null
+  // v2.4: "sem juros" só quando o total no cartão não passa do PIX
+  const semJuros = installmentValue > 0 && !installmentHasInterest(course)
   const cartItem = { course_id: course.id, slug: course.slug, title: course.title, cover_image: course.cover_image, category: course.category, price_pix: pricePix }
 
   // Depoimentos: do curso; se não houver, da mesma categoria
@@ -135,10 +160,15 @@ export default async function CoursePage({ params }: { params: { slug: string } 
                     <p className="text-4xl font-black text-primary-900">{brl(pricePix)}</p>
                     {installmentValue > 0 && (
                       <p className="text-gray-500 mt-1">
-                        ou {course.installments}x de <strong className="text-primary-700">{brl(installmentValue)}</strong> no cartão
+                        ou {course.installments}x de <strong className="text-primary-700">{brl(installmentValue)}</strong>{semJuros ? <strong className="text-green-700"> sem juros</strong> : null} no cartão
                       </p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">Aceita PIX · Cartão · Boleto</p>
+                    {tmbSim && (
+                      <div className="mt-4">
+                        <TmbTable sim={tmbSim} />
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">Aceita PIX · Cartão · Boleto{tmbAvailable ? ' · Parcelado sem cartão' : ''}</p>
                   </>
                 ) : (
                   <p className="text-2xl font-bold text-primary-700">Consulte condições</p>
@@ -147,7 +177,7 @@ export default async function CoursePage({ params }: { params: { slug: string } 
 
               {pricePix > 0 && (
                 <>
-                  <Link href={`/checkout?curso=${course.id}`} className="btn-primary w-full justify-center text-base py-4 mb-3">
+                  <Link href={checkoutHref} className="btn-primary w-full justify-center text-base py-4 mb-3">
                     Matricular agora
                   </Link>
                   <AddToCartButton item={cartItem} className="w-full py-3 mb-3" />
@@ -200,6 +230,23 @@ export default async function CoursePage({ params }: { params: { slug: string } 
                 <div className="relative h-64 md:h-80 rounded-2xl overflow-hidden shadow-lg">
                   <Image src={sec.image} alt={sec.title} fill sizes="(min-width: 768px) 448px, 100vw" className="object-cover" />
                 </div>
+              )}
+            </div>
+            {/* v2.4: botão de matrícula ao fim de cada seção adicional */}
+            <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5">
+              {pricePix > 0 ? (
+                <>
+                  <Link href={checkoutHref} className="btn-primary justify-center text-base px-8 py-3.5">Matricular agora</Link>
+                  <p className="text-sm text-gray-600">
+                    <strong className="text-primary-900">{brl(pricePix)}</strong> no PIX
+                    {installmentValue > 0 ? ` ou ${course.installments}x de ${brl(installmentValue)}${semJuros ? ' sem juros' : ''} no cartão` : ''}
+                    {tmbSim?.opcoes.length ? ` · ou boleto/PIX parcelado em até ${tmbSim.opcoes[tmbSim.opcoes.length - 1].parcelas}x` : ''}
+                  </p>
+                </>
+              ) : (
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="btn-primary justify-center text-base px-8 py-3.5">
+                  <MessageCircle size={18} /> Quero me matricular
+                </a>
               )}
             </div>
           </div>
@@ -373,7 +420,7 @@ export default async function CoursePage({ params }: { params: { slug: string } 
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {pricePix > 0 && (
-              <Link href={`/checkout?curso=${course.id}`} className="btn-primary text-base px-10 py-4 justify-center">
+              <Link href={checkoutHref} className="btn-primary text-base px-10 py-4 justify-center">
                 Matricular agora
               </Link>
             )}

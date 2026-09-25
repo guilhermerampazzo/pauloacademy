@@ -7,8 +7,8 @@ import Breadcrumbs from '@/components/public/Breadcrumbs'
 import Testimonials from '@/components/public/Testimonials'
 import CategoryCourses from '@/components/public/CategoryCourses'
 import JsonLd from '@/components/JsonLd'
-import { getCategories, getContent, getCourses, getTestimonials } from '@/lib/data'
-import { getCategoryInfo, slugifyCategory, categoryHref, RESERVED_SLUGS, knownCategoryName } from '@/lib/categories'
+import { getCategories, getContent, getCourses, getTestimonials, defaultOgImage } from '@/lib/data'
+import { getCategoryInfo, slugifyCategory, categoryHref, RESERVED_SLUGS, knownCategoryName, GROUP_PAGES } from '@/lib/categories'
 import { faqSchema, itemListSchema } from '@/lib/schema'
 import { brl, whatsappLink } from '@/lib/site'
 
@@ -21,10 +21,22 @@ type Override = { headline?: string; intro?: string; seo_title?: string; seo_des
 async function resolve(slug: string) {
   if (RESERVED_SLUGS.has(slug)) return null
   const categories = await getCategories()
-  // Categorias do menu Graduação (Bacharelado, Tecnólogo, Superior Sequencial) abrem mesmo sem cursos
-  const known = knownCategoryName(slug)
-  const found = categories.find(c => slugifyCategory(c.category) === slug)
-    || (known ? { category: known, count: 0, min_price: null } : null)
+  // v2.4: página de grupo (/eja reúne EJA Ensino Fundamental, EJA Ensino Médio e a categoria antiga "EJA")
+  const group = GROUP_PAGES[slug]
+  let found: { category: string; count: number; min_price: string | null } | null = null
+  let members: string[] = []
+  if (group) {
+    const inGroup = categories.filter(c => group.categories.includes(c.category))
+    const prices = inGroup.map(c => Number(c.min_price || 0)).filter(n => n > 0)
+    found = { category: group.name, count: inGroup.reduce((s, c) => s + c.count, 0), min_price: prices.length ? String(Math.min(...prices)) : null }
+    members = inGroup.map(c => c.category)
+  } else {
+    // Categorias do menu abrem mesmo sem cursos ("em breve" + WhatsApp, fora do Google)
+    const known = knownCategoryName(slug)
+    found = categories.find(c => slugifyCategory(c.category) === slug)
+      || (known ? { category: known, count: 0, min_price: null } : null)
+    if (found) members = [found.category]
+  }
   if (!found) return null
   const content = await getContent()
   const override = (content[`categoria_${slug}`] || {}) as Override
@@ -38,6 +50,7 @@ async function resolve(slug: string) {
     faq: override.faq?.length ? override.faq : info.faq,
     count: found.count,
     minPrice: found.min_price,
+    members,
     footer: (content.footer || {}) as Record<string, string>,
   }
 }
@@ -46,12 +59,14 @@ export async function generateMetadata({ params }: { params: { categoria: string
   const cat = await resolve(params.categoria)
   if (!cat) return { title: 'Página não encontrada', robots: { index: false } }
   const path = categoryHref(cat.name)
+  const ogImage = await defaultOgImage()
   return {
     ...(cat.count === 0 ? { robots: { index: false, follow: true } } : {}),
     title: { absolute: cat.seoTitle },
     description: cat.seoDescription,
     alternates: { canonical: path },
-    openGraph: { title: cat.seoTitle, description: cat.seoDescription, url: path, type: 'website' },
+    openGraph: { title: cat.seoTitle, description: cat.seoDescription, url: path, type: 'website', images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title: cat.seoTitle, description: cat.seoDescription, images: [ogImage] },
   }
 }
 
@@ -60,8 +75,9 @@ export default async function CategoryPage({ params }: { params: { categoria: st
   if (!cat) notFound()
 
   const [courses, testimonials] = await Promise.all([
-    getCourses({ category: cat.name }),
-    getTestimonials({ category: cat.name, limit: 6 }),
+    // v2.4: página de grupo busca os cursos de cada categoria do grupo
+    Promise.all(cat.members.map(m => getCourses({ category: m }))).then(l => l.flat()),
+    Promise.all((cat.members.length ? cat.members : [cat.name]).map(m => getTestimonials({ category: m, limit: 6 }))).then(l => l.flat().slice(0, 6)),
   ])
   const faq = faqSchema(cat.faq)
   const wa = whatsappLink(cat.footer.whatsapp, `Olá! Estou vendo os cursos de ${cat.label} no site e quero ajuda para escolher.`)

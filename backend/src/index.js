@@ -41,6 +41,8 @@ app.use('/upload', require('./routes/upload'))
 app.use('/dashboard', require('./routes/dashboard'))
 app.use('/search', require('./routes/search'))
 app.use('/blog', require('./routes/blog'))
+app.use('/tmb', require('./routes/tmb')) // v2.4: parcelado sem cartão
+app.use('/partners', require('./routes/partners')) // v2.4: páginas de parceiros
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
@@ -67,6 +69,9 @@ function securityWarnings() {
   }
   if (process.env.MERCADOPAGO_ACCESS_TOKEN && !process.env.MERCADOPAGO_WEBHOOK_SECRET) {
     warn('MERCADOPAGO_WEBHOOK_SECRET não configurada: a assinatura do webhook não será validada.')
+  }
+  if (process.env.TMB_API_TOKEN && !process.env.TMB_WEBHOOK_TOKEN) {
+    warn('TMB_API_TOKEN configurado sem TMB_WEBHOOK_TOKEN: o webhook da TMB será recusado e os pedidos parcelados não serão confirmados sozinhos.')
   }
   if (process.env.MERCADOPAGO_ACCESS_TOKEN && !(process.env.APP_URL || '').startsWith('https://')) {
     warn('APP_URL precisa ser https:// para o Mercado Pago enviar webhooks e redirecionar após o cartão.')

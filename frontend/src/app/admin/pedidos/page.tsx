@@ -12,6 +12,9 @@ const STATUS = {
   refunded: { label: 'Reembolsado', cls: 'bg-gray-100 text-gray-600', icon: <RefreshCw size={12} /> },
 }
 
+// v2.4: "tmb" = parcelado sem cartão (PIX ou boleto) pela TMB
+const METHOD_LABEL: Record<string, string> = { credit_card: 'cartão', pix: 'pix', boleto: 'boleto', tmb: 'parcelado TMB' }
+
 export default function PedidosPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,9 +131,10 @@ export default function PedidosPage() {
                         {Number(order.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
                       <td className="px-4 py-4 text-gray-500 text-xs">
-                        <span className="capitalize">{order.payment_method === 'credit_card' ? 'cartão' : order.payment_method}</span>
-                        {order.payment_status_detail && <p className="text-[11px] text-gray-400">MP: {order.payment_status_detail}</p>}
-                        {order.payment_error && <p className="text-[11px] text-red-500 max-w-[160px]" title={order.payment_error}>Erro MP: {order.payment_error.slice(0, 60)}</p>}
+                        <span className="capitalize">{METHOD_LABEL[order.payment_method] || order.payment_method}</span>
+                        {order.payment_status_detail && <p className="text-[11px] text-gray-400">{order.payment_method === 'tmb' ? 'TMB' : 'MP'}: {order.payment_status_detail.replace(/^tmb:/, '')}</p>}
+                        {order.tmb_order_id && <p className="text-[11px] text-gray-400">Pedido TMB {order.tmb_order_id}</p>}
+                        {order.payment_error && <p className="text-[11px] text-red-500 max-w-[160px]" title={order.payment_error}>Erro {order.payment_method === 'tmb' ? 'TMB' : 'MP'}: {order.payment_error.slice(0, 60)}</p>}
                       </td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex items-center gap-1 ${s.cls} badge`}>{s.icon} {s.label}</span>

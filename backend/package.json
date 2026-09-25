@@ -5,8 +5,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node tests/checkout.test.js && node tests/auth.test.js",
-    "test:auth": "node tests/auth.test.js"
+    "test": "node tests/checkout.test.js && node tests/auth.test.js && node tests/v24.test.js",
+    "test:auth": "node tests/auth.test.js",
+    "test:v24": "node tests/v24.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.441.0",

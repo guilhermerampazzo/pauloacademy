@@ -77,3 +77,20 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .prose-content th { @apply bg-gray-50 font-semibold text-primary-900 border border-gray-200 px-3 py-2; }
 .prose-content td { @apply border border-gray-200 px-3 py-2 text-gray-700 align-top; }
 .prose-content ul ul, .prose-content ol ol { @apply ml-5 mb-0 mt-1; }
+
+/* v2.4 – tabelas da descrição dos cursos no celular.
+   Antes: a tabela "Mercado de trabalho" passava da tela (622 px num celular de 390 px)
+   e a página inteira rolava para o lado. Agora a tabela rola só dentro do próprio bloco. */
+.prose-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 640px) {
+  .prose-content table { @apply text-sm; }
+  .prose-content th, .prose-content td { @apply px-2 py-1.5; min-width: 88px; }
+  .prose-content th:first-child, .prose-content td:first-child { min-width: 140px; }
+}
+/* textos longos sem espaço (URLs) também não empurram a largura */
+.prose-content { overflow-wrap: break-word; }

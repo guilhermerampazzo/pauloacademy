@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, GraduationCap, Instagram, Facebook, Youtube, Search, ShoppingCart, ChevronDown } from 'lucide-react'
-import { getCategoryInfo, categoryHref, GRADUACAO_MENU, GRADUACAO_NAMES } from '@/lib/categories'
+import { getCategoryInfo, categoryHref, MENU_GROUPS, MENU_SINGLE, isMenuCategory, GROUP_PAGES } from '@/lib/categories'
 import { useCart } from '@/lib/cart'
 import { whatsappLink } from '@/lib/site'
 import { track } from '@/lib/analytics'
@@ -26,14 +26,15 @@ interface Props {
 export default function Header({ socialData, categories = [] }: Props) {
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [gradOpen, setGradOpen] = useState(false)
-  const [gradMobile, setGradMobile] = useState(false)
+  // v2.4: menu retrátil – qual grupo está aberto (desktop) e quais estão abertos no celular
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [mobileGroups, setMobileGroups] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
   const { count, ready, setOpen: setCartOpen } = useCart()
   const d = socialData || {}
 
   // Fecha menus ao trocar de página
-  useEffect(() => { setOpen(false); setSearchOpen(false); setGradOpen(false) }, [pathname])
+  useEffect(() => { setOpen(false); setSearchOpen(false); setOpenGroup(null) }, [pathname])
 
   // Atalho "/" abre a busca
   useEffect(() => {
@@ -45,22 +46,30 @@ export default function Header({ socialData, categories = [] }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Categorias soltas no menu; Bacharelado, Tecnólogo e Superior Sequencial ficam no dropdown "Graduação"
-  const countOf = (name: string) => categories.find(c => c.category === name)?.count || 0
-  const nav = categories.filter(c => !GRADUACAO_NAMES.has(c.category))
-    .map(c => ({ ...getCategoryInfo(c.category), count: c.count }))
-    .sort((a, b) => a.order - b.order)
-  const navBefore = nav.filter(c => c.order < 3)   // EJA, Técnico
-  const navAfter = nav.filter(c => c.order >= 3)   // Pós-Graduação e outras
-  const grad = GRADUACAO_MENU.map(g => ({ ...g, href: categoryHref(g.name), count: countOf(g.name) }))
-  const gradActive = grad.some(g => pathname === g.href)
+  // Fecha o submenu aberto com Esc ou clique fora
+  useEffect(() => {
+    if (!openGroup) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenGroup(null) }
+    const onClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest?.('[data-menu-group]')) setOpenGroup(null)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('click', onClick)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('click', onClick) }
+  }, [openGroup])
 
-  const link = (c: { slug: string; name: string; label: string }) => (
-    <Link key={c.slug} href={categoryHref(c.name)}
-      className={`text-sm transition-colors ${pathname === categoryHref(c.name) ? 'text-white font-semibold' : 'text-blue-200 hover:text-white'}`}>
-      {c.label}
-    </Link>
-  )
+  // v2.4: menu montado a partir de MENU_GROUPS (src/lib/categories.ts).
+  // Categorias do banco que não estão no menu (ex.: criadas no admin) entram como itens soltos.
+  const countOf = (name: string) => categories.find(c => c.category === name)?.count || 0
+  const groupPageCats = new Set(Object.values(GROUP_PAGES).flatMap(g => g.categories))
+  const groups = MENU_GROUPS.map(g => ({
+    ...g,
+    items: g.items.map(i => ({ ...i, href: categoryHref(i.name), count: countOf(i.name) })),
+  }))
+  const extra = categories
+    .filter(c => !isMenuCategory(c.category) && !groupPageCats.has(c.category))
+    .map(c => ({ name: c.category, label: getCategoryInfo(c.category).label }))
+  const singles = [...MENU_SINGLE, ...extra].map(i => ({ ...i, href: categoryHref(i.name), count: countOf(i.name) }))
 
   const social = (size: number, cls: string) => (
     <>
@@ -83,28 +92,40 @@ export default function Header({ socialData, categories = [] }: Props) {
             </Link>
 
             <nav className="hidden lg:flex items-center gap-5" aria-label="Categorias de cursos">
-              {navBefore.map(link)}
-              <div className="relative" onMouseEnter={() => setGradOpen(true)} onMouseLeave={() => setGradOpen(false)}>
-                <button type="button" onClick={() => setGradOpen(v => !v)} aria-expanded={gradOpen} aria-haspopup="true"
-                  className={`flex items-center gap-1 text-sm transition-colors ${gradActive ? 'text-white font-semibold' : 'text-blue-200 hover:text-white'}`}>
-                  Graduação <ChevronDown size={14} className={`transition-transform ${gradOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {gradOpen && (
-                  <div className="absolute top-full left-0 pt-2 min-w-[220px] z-50">
-                    <div className="bg-white rounded-lg shadow-xl border border-gray-100 py-1.5">
-                      {grad.map(g => (
-                        <Link key={g.href} href={g.href} onClick={() => setGradOpen(false)}
-                          className={`flex items-center justify-between gap-4 px-4 py-2 text-sm hover:bg-primary-50 ${pathname === g.href ? 'text-accent-700 font-semibold' : 'text-primary-900'}`}>
-                          {g.label}
-                          {g.count > 0 && <span className="text-xs text-gray-400">{g.count}</span>}
-                        </Link>
-                      ))}
-                    </div>
+              {groups.map(g => {
+                const isOpen = openGroup === g.label
+                const active = g.items.some(i => pathname === i.href) || (g.slug === 'eja' && pathname === '/eja')
+                return (
+                  <div key={g.label} className="relative" data-menu-group
+                    onMouseEnter={() => setOpenGroup(g.label)} onMouseLeave={() => setOpenGroup(v => (v === g.label ? null : v))}>
+                    {/* clique abre (no computador o mouse já abre ao passar); fecha com Esc, clique fora ou ao sair com o mouse */}
+                    <button type="button" onClick={() => setOpenGroup(g.label)}
+                      aria-expanded={isOpen} aria-haspopup="true"
+                      className={`flex items-center gap-1 text-sm transition-colors ${active ? 'text-white font-semibold' : 'text-blue-200 hover:text-white'}`}>
+                      {g.label} <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="absolute top-full left-0 pt-2 min-w-[240px] z-50">
+                        <div className="bg-white rounded-lg shadow-xl border border-gray-100 py-1.5">
+                          {g.items.map(i => (
+                            <Link key={i.href} href={i.href} onClick={() => setOpenGroup(null)}
+                              className={`flex items-center justify-between gap-4 px-4 py-2 text-sm hover:bg-primary-50 ${pathname === i.href ? 'text-accent-700 font-semibold' : 'text-primary-900'}`}>
+                              {i.label}
+                              {i.count > 0 && <span className="text-xs text-gray-400">{i.count}</span>}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {navAfter.map(link)}
-              <Link href="/cursos" className="text-sm text-blue-200 hover:text-white">Todos os cursos</Link>
+                )
+              })}
+              {singles.map(i => (
+                <Link key={i.href} href={i.href}
+                  className={`text-sm transition-colors ${pathname === i.href ? 'text-white font-semibold' : 'text-blue-200 hover:text-white'}`}>
+                  {i.label}
+                </Link>
+              ))}
               <Link href="/blog" className={`text-sm transition-colors ${pathname?.startsWith('/blog') ? 'text-white font-semibold' : 'text-blue-200 hover:text-white'}`}>Blog</Link>
             </nav>
 
@@ -163,35 +184,37 @@ export default function Header({ socialData, categories = [] }: Props) {
 
         {open && (
           <div className="lg:hidden bg-primary-800 border-t border-primary-700 px-4 py-4 space-y-1">
-            {navBefore.map(c => (
-              <Link key={c.slug} href={categoryHref(c.name)} className="flex justify-between text-blue-100 hover:text-white py-2">
-                {c.label} <span className="text-blue-300 text-sm">{c.count}</span>
+            {groups.map(g => {
+              const isOpen = !!mobileGroups[g.label]
+              return (
+                <div key={g.label}>
+                  <button type="button" onClick={() => setMobileGroups(m => ({ ...m, [g.label]: !m[g.label] }))} aria-expanded={isOpen}
+                    className="flex items-center justify-between w-full text-blue-100 hover:text-white py-2.5">
+                    {g.label} <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="pl-4 border-l border-primary-600 ml-1 mb-1">
+                      {g.items.map(i => (
+                        <Link key={i.href} href={i.href} className="flex justify-between text-blue-200 hover:text-white py-2 text-sm">
+                          {i.label} {i.count > 0 && <span className="text-blue-300">{i.count}</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {singles.map(i => (
+              <Link key={i.href} href={i.href} className="flex justify-between text-blue-100 hover:text-white py-2.5">
+                {i.label} {i.count > 0 && <span className="text-blue-300 text-sm">{i.count}</span>}
               </Link>
             ))}
-            <button type="button" onClick={() => setGradMobile(v => !v)} aria-expanded={gradMobile}
-              className="flex items-center justify-between w-full text-blue-100 hover:text-white py-2">
-              Graduação <ChevronDown size={16} className={`transition-transform ${gradMobile ? 'rotate-180' : ''}`} />
-            </button>
-            {gradMobile && (
-              <div className="pl-4 border-l border-primary-600 ml-1">
-                {grad.map(g => (
-                  <Link key={g.href} href={g.href} className="flex justify-between text-blue-200 hover:text-white py-1.5 text-sm">
-                    {g.label} {g.count > 0 && <span className="text-blue-300">{g.count}</span>}
-                  </Link>
-                ))}
-              </div>
-            )}
-            {navAfter.map(c => (
-              <Link key={c.slug} href={categoryHref(c.name)} className="flex justify-between text-blue-100 hover:text-white py-2">
-                {c.label} <span className="text-blue-300 text-sm">{c.count}</span>
-              </Link>
-            ))}
-            <Link href="/cursos" className="block text-blue-100 hover:text-white py-2">Todos os cursos</Link>
             <div className="border-t border-primary-700 my-2" />
             <Link href="/como-funciona" className="block text-blue-300 hover:text-white py-1.5 text-sm">Como funciona</Link>
             <Link href="/reconhecimento-mec" className="block text-blue-300 hover:text-white py-1.5 text-sm">Reconhecimento MEC</Link>
             <Link href="/blog" className="block text-blue-300 hover:text-white py-1.5 text-sm">Blog</Link>
             <Link href="/sobre-nos" className="block text-blue-300 hover:text-white py-1.5 text-sm">Sobre nós</Link>
+            <Link href="/parceiros" className="block text-blue-300 hover:text-white py-1.5 text-sm">Parceiros</Link>
             <div className="flex gap-3 pt-2">
               {social(18, 'w-9 h-9 bg-primary-700 rounded-lg flex items-center justify-center text-blue-300 hover:text-white')}
             </div>

@@ -78,3 +78,56 @@ export async function searchCourses(params: Record<string, string>): Promise<Sea
     query: params.q || '', total: 0, total_all_categories: 0, facets: {}, fuzzy: false, suggestion: null, results: [],
   })
 }
+
+// v2.4: parcelado sem cartão (TMB) – só o que a página pública precisa saber (sem token nem IDs)
+export interface TmbPublic {
+  enabled: boolean
+  min_value?: number
+  categories?: Record<string, { max_parcelas?: number | null; juros_mes?: number | null; entrada_tipo?: 'percentual' | 'valor' | null; entrada_valor?: number | null; parcela_minima?: number | null }>
+}
+export const getTmbPublic = () => get<TmbPublic>('/tmb/public', 300, { enabled: false })
+
+// v2.4: imagem padrão dos links compartilhados (WhatsApp, Facebook, Instagram).
+// Pode ser trocada no painel: Conteúdo > Rastreamento > Imagem de compartilhamento.
+export const DEFAULT_OG_IMAGE = '/og-default.jpg'
+export async function defaultOgImage(): Promise<string> {
+  const content = await getContent()
+  const url = String((content.tracking as Record<string, unknown> | undefined)?.og_image || '').trim()
+  return url || DEFAULT_OG_IMAGE
+}
+
+// v2.4: parceiros (instituições de ensino e empresas/convênios)
+export type PartnerType = 'ies' | 'empresa'
+export interface Partner {
+  id: number
+  type: PartnerType
+  slug: string
+  name: string
+  logo?: string | null
+  cover_image?: string | null
+  summary?: string | null
+  content?: string | null
+  website?: string | null
+  city?: string | null
+  state?: string | null
+  emec_code?: string | null
+  emec_url?: string | null
+  accreditation?: string | null
+  mec_score?: string | null
+  benefit?: string | null
+  eligibility?: string | null
+  related_category?: string | null
+  whatsapp_message?: string | null
+  featured?: boolean
+  seo_title?: string | null
+  seo_description?: string | null
+  updated_at?: string
+  coupon?: { code: string; discount_percent: number } | null
+  related_courses?: Course[]
+}
+export const PARTNER_TYPE_LABEL: Record<PartnerType, string> = {
+  ies: 'Instituição de ensino',
+  empresa: 'Empresa e convênio',
+}
+export const getPartners = (type?: PartnerType) => get<Partner[]>(`/partners${type ? `?type=${type}` : ''}`, 120, [])
+export const getPartner = (slug: string) => get<Partner | null>(`/partners/slug/${encodeURIComponent(slug)}`, 120, null)

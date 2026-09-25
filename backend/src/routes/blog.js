@@ -69,6 +69,12 @@ router.get('/admin/:id', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar post' }) }
 })
 
+function normalizeDate(v) {
+  if (!v) return null
+  const d = new Date(v)
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 function fields(body) {
   return [
     String(body.title || '').trim(),
@@ -78,7 +84,8 @@ function fields(body) {
     body.related_category || null,
     body.author || null,
     !!body.published,
-    body.published_at || null,
+    // v2.4: data/hora de publicação chega em ISO com fuso (ex.: 2026-10-01T12:00:00.000Z) e é gravada em UTC
+    normalizeDate(body.published_at),
     body.seo_title || null,
     body.seo_description || null,
   ]
@@ -92,7 +99,7 @@ router.post('/', requireAuth, async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO blog_posts (slug, title, excerpt, content, cover_image, related_category, author,
                                published, published_at, seo_title, seo_description)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, CASE WHEN $8 AND $9::timestamp IS NULL THEN NOW() ELSE $9::timestamp END, $10,$11) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, CASE WHEN $8 AND $9::timestamptz IS NULL THEN NOW() ELSE $9::timestamptz END, $10,$11) RETURNING *`,
       [slug, ...f]
     )
     res.status(201).json(rows[0])
@@ -111,7 +118,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     const { rows } = await pool.query(
       `UPDATE blog_posts SET slug=$1, title=$2, excerpt=$3, content=$4, cover_image=$5, related_category=$6,
               author=$7, published=$8,
-              published_at = CASE WHEN $8 AND $9::timestamp IS NULL THEN COALESCE(published_at, NOW()) ELSE $9::timestamp END,
+              published_at = CASE WHEN $8 AND $9::timestamptz IS NULL THEN COALESCE(published_at, NOW()) ELSE $9::timestamptz END,
               seo_title=$10, seo_description=$11
        WHERE id=$12 RETURNING *`,
       [slug, ...f, req.params.id]

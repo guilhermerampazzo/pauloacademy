@@ -12,11 +12,12 @@ import { z } from 'zod'
 import toast from 'react-hot-toast'
 import {
   Tag, CheckCircle, ArrowLeft, Loader2, Copy, ExternalLink, QrCode, CreditCard, Barcode,
-  ShieldCheck, MessageCircle, AlertCircle, Trash2, Lock,
+  ShieldCheck, MessageCircle, AlertCircle, Trash2, Lock, CalendarClock,
 } from 'lucide-react'
 import { useCart, fetchQuote, type Quote } from '@/lib/cart'
 import { brl } from '@/lib/site'
 import { track } from '@/lib/analytics'
+import TmbTable from '@/components/public/TmbTable'
 
 function isValidCPF(value?: string) {
   const cpf = String(value || '').replace(/\D/g, '')
@@ -35,14 +36,14 @@ const schema = z.object({
   customer_email: z.string().trim().email('E-mail inválido'),
   customer_phone: z.string().refine(v => v.replace(/\D/g, '').length >= 10, 'Telefone com DDD'),
   customer_cpf: z.string().optional(),
-  payment_method: z.enum(['pix', 'credit_card', 'boleto']),
+  payment_method: z.enum(['pix', 'credit_card', 'boleto', 'tmb']),
 }).refine(d => d.payment_method !== 'boleto' || isValidCPF(d.customer_cpf), { path: ['customer_cpf'], message: 'CPF inválido' })
 
 type FormData = z.infer<typeof schema>
 
 interface OrderResult {
   order: { id: number; amount: number; status: string; access_token: string }
-  mode: 'mercadopago' | 'whatsapp' | 'error'
+  mode: 'mercadopago' | 'whatsapp' | 'error' | 'tmb'
   payment_url?: string
   pix_qr_code?: string
   pix_qr_code_base64?: string
@@ -60,9 +61,17 @@ const maskPhone = (v: string) => {
 const maskCPF = (v: string) => v.replace(/\D/g, '').slice(0, 11)
   .replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2')
 
+// Lê o client_id do cookie _ga (GA1.1.123.456 -> 123.456)
+function gaClientId(): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  const m = document.cookie.match(/(?:^|;\s*)_ga=GA\d\.\d\.(\d+\.\d+)/)
+  return m ? m[1] : undefined
+}
+
 function CheckoutInner() {
   const params = useSearchParams()
   const single = Number(params.get('curso')) || null
+  const preferred = params.get('pagamento')
   const cart = useCart()
 
   const courseIds = single ? [single] : cart.items.map(i => i.course_id)
@@ -82,6 +91,17 @@ function CheckoutInner() {
     defaultValues: { payment_method: 'pix' },
   })
   const paymentMethod = watch('payment_method')
+  const tmbAvailable = !!quote?.tmb?.available
+
+  // v2.4: /checkout?curso=ID&pagamento=tmb já abre com o parcelado sem cartão marcado
+  useEffect(() => {
+    if (preferred === 'tmb' && tmbAvailable && paymentMethod !== 'tmb') setValue('payment_method', 'tmb')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferred, tmbAvailable])
+  // Se a TMB deixar de valer (ex.: aplicou cupom), volta para o PIX
+  useEffect(() => {
+    if (paymentMethod === 'tmb' && quote && !tmbAvailable) setValue('payment_method', 'pix')
+  }, [paymentMethod, quote, tmbAvailable, setValue])
 
   const loadQuote = useCallback(async () => {
     if (!idsKey) { setQuote(null); setQuoteLoading(false); return }
@@ -137,6 +157,8 @@ function CheckoutInner() {
           coupon_code: quote.coupon?.code,
           ...data,
           customer_cpf: data.customer_cpf?.replace(/\D/g, ''),
+          // v2.4: ID do Google Analytics – permite registrar no GA4 a venda confirmada pela TMB (fora do site)
+          ga_client_id: gaClientId(),
         }),
       })
       const r: OrderResult & { error?: string } = await res.json()
@@ -151,6 +173,12 @@ function CheckoutInner() {
       // Pedido criado: o carrinho pode ser esvaziado (se veio dele)
       if (!single) cart.clear()
 
+      // v2.4: parcelado sem cartão – segue para o checkout da TMB
+      if (r.mode === 'tmb' && r.payment_url) {
+        track('add_payment_info', { currency: 'BRL', value: Number(r.order.amount), payment_type: 'tmb' })
+        window.location.href = r.payment_url
+        return
+      }
       if (r.mode === 'whatsapp') {
         window.location.href = r.whatsapp_fallback || '/'
         return
@@ -296,11 +324,16 @@ function CheckoutInner() {
 
                 <div>
                   <span className="label">Forma de pagamento *</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 ${tmbAvailable ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-3 mt-1`}>
                     {[
                       { value: 'pix', label: 'PIX', desc: 'Aprovação na hora', icon: <QrCode size={22} /> },
                       { value: 'credit_card', label: 'Cartão', desc: `até ${quote?.maxInstallments || 12}x`, icon: <CreditCard size={22} /> },
                       { value: 'boleto', label: 'Boleto', desc: 'Vence em 3 dias úteis', icon: <Barcode size={22} /> },
+                      ...(tmbAvailable ? [{
+                        value: 'tmb', label: 'Parcelado sem cartão',
+                        desc: `PIX ou boleto${quote?.tmb?.max_parcelas ? ` em até ${quote.tmb.max_parcelas}x` : ' parcelado'}`,
+                        icon: <CalendarClock size={22} />,
+                      }] : []),
                     ].map(opt => (
                       <label key={opt.value}
                         className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === opt.value ? 'border-primary-600 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -315,6 +348,16 @@ function CheckoutInner() {
                   </div>
                 </div>
 
+                {paymentMethod === 'tmb' && (
+                  <div className="rounded-xl border border-accent-200 bg-accent-50 p-4 text-sm text-gray-700 space-y-1.5">
+                    <p className="font-semibold text-primary-900">Como funciona o parcelado sem cartão</p>
+                    <p>Você continua no checkout seguro da <strong>TMB</strong>, nossa parceira de parcelamento. Lá você escolhe o número de parcelas e o dia de vencimento, confirma seus dados e paga a entrada no PIX ou no boleto.</p>
+                    {quote?.tmb?.simulacao ? <div className="py-1"><TmbTable sim={quote.tmb.simulacao} compact /></div>
+                      : <p>A TMB faz uma análise de cadastro e cobra juros nas parcelas. O valor de cada parcela aparece antes de você confirmar.</p>}
+                    <p>A matrícula é confirmada assim que a entrada for paga.</p>
+                  </div>
+                )}
+
                 {paymentMethod === 'boleto' && (
                   <div>
                     <label className="label" htmlFor="cpf">CPF * (obrigatório para boleto)</label>
@@ -325,11 +368,13 @@ function CheckoutInner() {
                 )}
 
                 <button type="submit" disabled={submitting || quoteLoading || !itemsCount} className="btn-primary w-full justify-center text-base py-4 mt-2 disabled:opacity-60">
-                  {submitting ? <><Loader2 size={20} className="animate-spin" /> Processando...</> : `Finalizar matrícula · ${brl(quote?.total || 0)}`}
+                  {submitting ? <><Loader2 size={20} className="animate-spin" /> Processando...</>
+                    : paymentMethod === 'tmb' ? 'Continuar para o parcelamento'
+                    : `Finalizar matrícula · ${brl(quote?.total || 0)}`}
                 </button>
 
                 <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-1">
-                  <ShieldCheck size={14} className="text-green-600" /> Pagamento processado pelo Mercado Pago. Seus dados são protegidos.
+                  <ShieldCheck size={14} className="text-green-600" /> {paymentMethod === 'tmb' ? 'Parcelamento processado pela TMB.' : 'Pagamento processado pelo Mercado Pago.'} Seus dados são protegidos.
                 </p>
                 <p className="text-center text-[11px] text-gray-400">
                   Ao finalizar você concorda com os <Link href="/termos-de-uso" className="underline" target="_blank">Termos de Uso</Link> e a <Link href="/politica-de-privacidade" className="underline" target="_blank">Política de Privacidade</Link>.
@@ -385,6 +430,9 @@ function CheckoutInner() {
                 </div>
                 {quote?.coupon && <p className="text-green-600 text-xs mt-1 flex items-center gap-1"><CheckCircle size={12} /> {quote.coupon.code}: {quote.coupon.discount_percent}% de desconto</p>}
                 {coupon && quote?.couponError && <p className="text-red-500 text-xs mt-1">{quote.couponError}</p>}
+                {quote?.tmb && !quote.tmb.available && quote.tmb.reason && (
+                  <p className="text-gray-400 text-xs mt-1">{quote.tmb.reason}</p>
+                )}
               </div>
 
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-2">

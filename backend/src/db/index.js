@@ -1,10 +1,15 @@
-const { Pool } = require('pg')
+const { Pool, types } = require('pg')
+
+// v2.4: datas sempre em UTC (sessão do banco e leitura no Node), para o agendamento
+// do blog e os horários do admin não dependerem do fuso do servidor.
+types.setTypeParser(1114, s => (s ? new Date(s.replace(' ', 'T') + 'Z') : s))
 const fs = require('fs')
 const path = require('path')
 const bcrypt = require('bcryptjs')
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  options: '-c timezone=UTC',
 })
 
 async function initDb() {
@@ -179,7 +184,7 @@ async function seedSampleData() {
       'Curso EJA – Educação de Jovens e Adultos',
       'Conclua em 4 meses com certificado reconhecido',
       '<h2>Sobre o Curso</h2><p>O Curso EJA é voltado para jovens e adultos que desejam concluir o Ensino Fundamental ou Médio de forma rápida e certificada. Com metodologia adaptada ao perfil adulto, você estuda no seu ritmo, sem abrir mão da qualidade.</p><h2>Para quem é este curso?</h2><ul><li>Adultos que não concluíram os estudos na idade regular</li><li>Profissionais que precisam do diploma para progressão na carreira</li><li>Pessoas que buscam valorização pessoal e profissional</li></ul>',
-      200, 'EAD', '4 meses', 'EJA',
+      200, 'EAD', '4 meses', 'EJA Ensino Médio',
       1350.00, 1350.00, 12, 112.50,
       true, true,
       'Olá! Tenho interesse no Curso EJA. Podem me passar mais informações?'

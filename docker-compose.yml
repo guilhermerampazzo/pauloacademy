@@ -58,6 +58,11 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
       - TWOFA_ENCRYPTION_KEY=${TWOFA_ENCRYPTION_KEY:-}
+      # v2.4: parcelado sem cartão (TMB) e vendas da TMB no GA4
+      - TMB_API_TOKEN=${TMB_API_TOKEN:-}
+      - TMB_WEBHOOK_TOKEN=${TMB_WEBHOOK_TOKEN:-}
+      - TMB_WEBHOOK_HEADER=${TMB_WEBHOOK_HEADER:-x-tmb-token}
+      - GA4_API_SECRET=${GA4_API_SECRET:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@paulopop.com.br}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin@2024}
       - ADMIN_NAME=${ADMIN_NAME:-Paulo Pop}

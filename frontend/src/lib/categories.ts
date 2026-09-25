@@ -136,6 +136,146 @@ const KNOWN: Record<string, Omit<CategoryInfo, 'name' | 'slug'>> = {
     seoDescription: 'Pós-graduações e MBAs 100% online com certificado de validade nacional. Estude no seu ritmo e pague no PIX ou em até 12x.',
     order: 6,
   },
+  // v2.4: novas categorias do menu retrátil
+  'eja-ensino-fundamental': {
+    label: 'EJA Ensino Fundamental',
+    headline: 'EJA Ensino Fundamental online: conclua o 6º ao 9º ano no seu ritmo',
+    intro: 'Não terminou o Ensino Fundamental? Com o EJA online você conclui essa etapa estudando pelo celular ou computador e recebe o certificado de validade nacional, emitido por instituição credenciada.',
+    audience: ['Quem tem 15 anos ou mais e não concluiu o Ensino Fundamental', 'Quem precisa do certificado para trabalhar ou fazer um curso', 'Quem quer seguir depois para o EJA Ensino Médio'],
+    benefits: [
+      { title: 'Certificado com validade nacional', text: 'Emitido por instituição credenciada, igual ao do ensino regular.' },
+      { title: '100% online', text: 'Estude no horário que couber na sua rotina.' },
+      { title: 'Acompanhamento humano', text: 'Nossa equipe acompanha você até o certificado.' },
+    ],
+    faq: [
+      { question: 'Qual a idade mínima para o EJA Ensino Fundamental?', answer: 'A partir de 15 anos completos, conforme as regras da Educação de Jovens e Adultos.' },
+      { question: 'Depois posso fazer o EJA Ensino Médio?', answer: 'Sim. Com o certificado do Fundamental você pode se matricular no EJA Ensino Médio.' },
+    ],
+    seoTitle: 'EJA Ensino Fundamental Online com Certificado | Academy Pop',
+    seoDescription: 'Conclua o Ensino Fundamental pelo EJA 100% online, com certificado de validade nacional e acompanhamento do início ao fim.',
+    order: 1.1,
+  },
+  'eja-ensino-medio': {
+    label: 'EJA Ensino Médio',
+    headline: 'EJA Ensino Médio online: conclua o Ensino Médio no seu ritmo',
+    intro: 'Termine o Ensino Médio estudando online e receba o certificado de validade nacional, emitido por instituição credenciada. Ideal para emprego, concurso, curso técnico ou faculdade.',
+    audience: ['Quem tem 18 anos ou mais e não concluiu o Ensino Médio', 'Quem precisa do certificado para emprego, promoção ou concurso', 'Quem quer entrar em curso técnico ou faculdade'],
+    benefits: [
+      { title: 'Certificado com validade nacional', text: 'Emitido por instituição credenciada, igual ao do ensino regular.' },
+      { title: '100% online', text: 'Estude pelo celular ou computador, no seu horário.' },
+      { title: 'Acompanhamento humano', text: 'Nossa equipe tira dúvidas e acompanha você até o certificado.' },
+    ],
+    faq: [
+      { question: 'Qual a idade mínima para o EJA Ensino Médio?', answer: 'A partir de 18 anos completos, conforme as regras da Educação de Jovens e Adultos.' },
+      { question: 'Posso fazer faculdade depois do EJA?', answer: 'Sim. Com o certificado do Ensino Médio você pode prestar vestibular, Enem e se matricular em cursos técnicos e superiores.' },
+    ],
+    seoTitle: 'EJA Ensino Médio Online com Certificado | Academy Pop',
+    seoDescription: 'Conclua o Ensino Médio pelo EJA 100% online, com certificado de validade nacional e acompanhamento do início ao fim.',
+    order: 1.2,
+  },
+  'pos-tecnico': {
+    label: 'Pós-Técnico',
+    headline: 'Pós-Técnico EAD: especialização técnica para quem já é técnico',
+    intro: 'A especialização técnica de nível médio (pós-técnico) aprofunda a sua formação numa área específica. É para quem já concluiu um curso técnico e quer se destacar no mercado.',
+    audience: ['Técnicos formados que querem se especializar', 'Quem busca promoção ou uma nova função na área', 'Quem precisa comprovar especialização técnica'],
+    benefits: [
+      { title: 'Foco na sua área', text: 'Conteúdo específico para quem já atua como técnico.' },
+      { title: '100% online', text: 'Estude no seu ritmo, sem parar de trabalhar.' },
+      { title: 'Atendimento humano', text: 'Consultores ajudam você a escolher a especialização certa.' },
+    ],
+    faq: [
+      { question: 'Quem pode fazer um pós-técnico?', answer: 'Quem já concluiu um curso técnico de nível médio, em geral na mesma área ou em área relacionada. Confira os requisitos na página de cada curso.' },
+    ],
+    seoTitle: 'Pós-Técnico EAD – Especialização Técnica | Academy Pop',
+    seoDescription: 'Especialização técnica de nível médio 100% online para quem já é técnico. Fale com um consultor da Academy Pop.',
+    order: 2.5,
+  },
+  'tecnico-para-tecnologo': {
+    label: 'Técnico para Tecnólogo',
+    headline: 'Técnico para Tecnólogo: aproveite o seu curso técnico e chegue à graduação mais rápido',
+    intro: 'Quem já tem diploma de curso técnico pode aproveitar disciplinas e concluir uma graduação tecnológica em menos tempo, com diploma de nível superior reconhecido pelo MEC. As regras de aproveitamento variam por curso e instituição.',
+    audience: ['Técnicos formados que querem o diploma de nível superior', 'Quem quer aproveitar o que já estudou no curso técnico', 'Quem busca promoção, concurso ou pós-graduação depois'],
+    benefits: [
+      { title: 'Aproveitamento do técnico', text: 'Parte das disciplinas pode ser aproveitada, conforme a análise da instituição.' },
+      { title: 'É graduação', text: 'Diploma de tecnólogo, de nível superior, reconhecido pelo MEC.' },
+      { title: '100% online', text: 'Estude pelo celular ou computador, no seu ritmo.' },
+    ],
+    faq: [
+      { question: 'Quanto tempo leva do técnico ao tecnólogo?', answer: 'Depende do curso e do aproveitamento aprovado pela instituição. Fale com um consultor e envie o seu histórico para uma análise.' },
+      { question: 'Preciso ter o diploma do técnico?', answer: 'Sim. O aproveitamento é feito a partir do diploma e do histórico do curso técnico concluído.' },
+    ],
+    seoTitle: 'Técnico para Tecnólogo EAD – Aproveite seu Curso Técnico | Academy Pop',
+    seoDescription: 'Transforme o seu curso técnico em graduação tecnológica reconhecida pelo MEC, com aproveitamento de disciplinas. 100% online.',
+    order: 4.5,
+  },
+  'segunda-licenciatura': {
+    label: '2ª Licenciatura',
+    headline: 'Segunda Licenciatura EAD: habilite-se para lecionar em outra área',
+    intro: 'Para professores que já têm licenciatura e querem lecionar outra disciplina. Curso de nível superior, 100% online, com diploma reconhecido pelo MEC.',
+    audience: ['Professores licenciados que querem ampliar a área de atuação', 'Quem busca mais aulas ou progressão na carreira docente', 'Quem precisa da habilitação para concurso'],
+    benefits: [
+      { title: 'Nova habilitação', text: 'Diploma de licenciatura na nova área, reconhecido pelo MEC.' },
+      { title: 'Duração menor', text: 'Mais curta que uma primeira licenciatura, porque aproveita a formação pedagógica.' },
+      { title: '100% online', text: 'Estude sem deixar a sala de aula.' },
+    ],
+    faq: [
+      { question: 'Quem pode fazer a segunda licenciatura?', answer: 'Quem já concluiu uma licenciatura. Os requisitos exatos estão na página de cada curso.' },
+    ],
+    seoTitle: 'Segunda Licenciatura EAD Reconhecida pelo MEC | Academy Pop',
+    seoDescription: 'Segunda licenciatura 100% online para professores que querem lecionar em outra área, com diploma reconhecido pelo MEC.',
+    order: 4.6,
+  },
+  'segunda-graduacao': {
+    label: '2ª Graduação',
+    headline: 'Segunda Graduação EAD: um novo diploma aproveitando o que você já estudou',
+    intro: 'Já tem curso superior? Na segunda graduação você pode aproveitar disciplinas da primeira e conquistar um novo diploma em menos tempo, 100% online e reconhecido pelo MEC.',
+    audience: ['Quem já é graduado e quer mudar de área', 'Quem precisa de um segundo diploma para concurso ou promoção', 'Quem quer aproveitar disciplinas já cursadas'],
+    benefits: [
+      { title: 'Aproveitamento de disciplinas', text: 'Conforme a análise do histórico pela instituição.' },
+      { title: 'Reconhecido pelo MEC', text: 'Diploma de graduação com validade nacional.' },
+      { title: 'Atendimento humano', text: 'Consultores ajudam a escolher o curso e a enviar os documentos.' },
+    ],
+    faq: [
+      { question: 'A segunda graduação é mais curta?', answer: 'Pode ser, dependendo das disciplinas aproveitadas da primeira graduação. Fale com um consultor para uma análise.' },
+    ],
+    seoTitle: 'Segunda Graduação EAD Reconhecida pelo MEC | Academy Pop',
+    seoDescription: 'Segunda graduação 100% online com aproveitamento de disciplinas e diploma reconhecido pelo MEC. Fale com um consultor.',
+    order: 4.7,
+  },
+  'mestrado-e-doutorado': {
+    label: 'Mestrado e Doutorado',
+    headline: 'Mestrado e Doutorado',
+    intro: 'Pós-graduação stricto sensu para quem quer seguir carreira acadêmica, docência no ensino superior ou pesquisa. Antes de se matricular, confira se o programa é recomendado pela CAPES e se o diploma será válido no Brasil. Um consultor ajuda você a verificar.',
+    audience: ['Graduados e especialistas que querem a carreira acadêmica', 'Professores que buscam titulação para o ensino superior', 'Profissionais que querem pontuar em concursos e planos de carreira'],
+    benefits: [
+      { title: 'Orientação na escolha', text: 'Ajudamos a verificar a recomendação do programa pela CAPES e a validade do diploma.' },
+      { title: 'Titulação acadêmica', text: 'Mestrado e doutorado são exigidos para muitas carreiras no ensino superior.' },
+      { title: 'Atendimento humano', text: 'Consultores explicam requisitos, prazos e documentos.' },
+    ],
+    faq: [
+      { question: 'Mestrado EAD tem validade?', answer: 'Tem validade no Brasil quando o programa é recomendado pela CAPES e reconhecido pelo MEC. Títulos de programas estrangeiros precisam ser reconhecidos por uma universidade brasileira. Confira sempre antes de se matricular.' },
+    ],
+    seoTitle: 'Mestrado e Doutorado | Academy Pop',
+    seoDescription: 'Mestrado e doutorado com orientação para escolher um programa válido no Brasil. Fale com um consultor da Academy Pop.',
+    order: 5.5,
+  },
+  'livre': {
+    label: 'Cursos Livres',
+    headline: 'Cursos livres EAD com certificado',
+    intro: 'Cursos rápidos de qualificação profissional, 100% online, com certificado de conclusão. Os cursos livres não precisam de autorização do MEC e não substituem um diploma técnico ou de graduação.',
+    audience: ['Quem quer aprender uma habilidade nova rapidamente', 'Quem precisa de horas complementares ou atualização', 'Quem quer melhorar o currículo'],
+    benefits: [
+      { title: 'Rápido e prático', text: 'Conteúdo direto ao ponto para aplicar no trabalho.' },
+      { title: 'Certificado de conclusão', text: 'Para incluir no currículo e comprovar a qualificação.' },
+      { title: '100% online', text: 'Estude no seu ritmo, pelo celular ou computador.' },
+    ],
+    faq: [
+      { question: 'Curso livre é reconhecido pelo MEC?', answer: 'Não. Cursos livres não passam por autorização ou reconhecimento do MEC. O certificado comprova a qualificação, mas não equivale a curso técnico ou graduação.' },
+    ],
+    seoTitle: 'Cursos Livres EAD com Certificado | Academy Pop',
+    seoDescription: 'Cursos livres 100% online com certificado de conclusão para qualificação profissional. Conheça os cursos da Academy Pop.',
+    order: 7,
+  },
 }
 
 const GENERIC = (name: string): Omit<CategoryInfo, 'name' | 'slug'> => ({
@@ -154,20 +294,81 @@ const GENERIC = (name: string): Omit<CategoryInfo, 'name' | 'slug'> => ({
   order: 50,
 })
 
-// Menu "Graduação" (dropdown): cada item é uma categoria com página própria.
-// "Bacharelado" = categoria "Graduação" (endereço /graduacao).
-// As páginas existem mesmo sem cursos cadastrados (mostram "em breve" + WhatsApp).
-export const GRADUACAO_MENU: { name: string; label: string }[] = [
-  { name: 'Graduação', label: 'Bacharelado' },
-  { name: 'Tecnólogo', label: 'Tecnólogo' },
-  { name: 'Superior Sequencial', label: 'Superior Sequencial' },
+// v2.4: menu retrátil de cursos. Cada grupo abre uma lista; cada item é uma categoria
+// com página própria (/slug). Itens sem cursos cadastrados abrem mesmo assim
+// ("em breve" + WhatsApp) e ficam fora do Google (noindex) até ter cursos.
+// "name" é exatamente o valor do campo "category" do curso no banco.
+export interface MenuItem { name: string; label: string }
+export interface MenuGroup { label: string; slug: string; items: MenuItem[] }
+
+export const MENU_GROUPS: MenuGroup[] = [
+  {
+    label: 'EJA', slug: 'eja',
+    items: [
+      { name: 'EJA Ensino Fundamental', label: 'EJA Ensino Fundamental' },
+      { name: 'EJA Ensino Médio', label: 'EJA Ensino Médio' },
+    ],
+  },
+  {
+    label: 'Técnico', slug: 'grupo-tecnico',
+    items: [
+      { name: 'Técnico', label: 'Cursos Técnicos' },
+      { name: 'Pós-Técnico', label: 'Pós-Técnico' },
+    ],
+  },
+  {
+    label: 'Graduação', slug: 'grupo-graduacao',
+    items: [
+      { name: 'Graduação', label: 'Bacharelado' },
+      { name: 'Tecnólogo', label: 'Tecnólogo' },
+      { name: 'Técnico para Tecnólogo', label: 'Técnico para Tecnólogo' },
+      { name: 'Segunda Licenciatura', label: '2ª Licenciatura' },
+      { name: 'Segunda Graduação', label: '2ª Graduação' },
+      { name: 'Superior Sequencial', label: 'Superior Sequencial' },
+      { name: 'Mestrado e Doutorado', label: 'Mestrado e Doutorado' },
+    ],
+  },
 ]
+
+/** Itens soltos do menu (sem submenu), depois dos grupos */
+export const MENU_SINGLE: MenuItem[] = [
+  { name: 'Pós-Graduação', label: 'Pós-Graduação' },
+  { name: 'Livre', label: 'Cursos Livres' },
+]
+
+/** Todas as categorias previstas no menu, na ordem do menu (usado no admin e no rodapé) */
+export const MENU_CATEGORY_NAMES: string[] = [
+  ...MENU_GROUPS.flatMap(g => g.items.map(i => i.name)),
+  ...MENU_SINGLE.map(i => i.name),
+]
+const MENU_NAMES = new Set(MENU_CATEGORY_NAMES)
+
+// Compatibilidade (v2.2/v2.3): o menu "Graduação" antigo
+export const GRADUACAO_MENU = MENU_GROUPS[2].items
 export const GRADUACAO_NAMES = new Set(GRADUACAO_MENU.map(g => g.name))
 
-/** Categorias com texto próprio: a página abre mesmo se ainda não houver cursos */
+/**
+ * Páginas de grupo: /eja lista os cursos de EJA Fundamental, EJA Médio e da
+ * categoria antiga "EJA" (a página /eja já está no Google e continua existindo).
+ */
+export const GROUP_PAGES: Record<string, { name: string; categories: string[] }> = {
+  eja: { name: 'EJA', categories: ['EJA Ensino Fundamental', 'EJA Ensino Médio', 'EJA'] },
+}
+
+/** Categorias do menu: a página abre mesmo se ainda não houver cursos */
 export function knownCategoryName(slug: string): string | null {
-  const g = GRADUACAO_MENU.find(x => slugifyCategory(x.name) === slug)
-  return g ? g.name : null
+  const name = MENU_CATEGORY_NAMES.find(n => slugifyCategory(n) === slug)
+  return name || null
+}
+
+/** Nome como aparece no menu (ex.: "Graduação" -> "Bacharelado") */
+export function menuLabel(name: string) {
+  const item = [...MENU_GROUPS.flatMap(g => g.items), ...MENU_SINGLE].find(i => i.name === name)
+  return item ? item.label : getCategoryInfo(name).label
+}
+
+export function isMenuCategory(name: string) {
+  return MENU_NAMES.has(name)
 }
 
 export function getCategoryInfo(name: string): CategoryInfo {
@@ -187,5 +388,5 @@ export function sortCategories<T extends { category: string }>(list: T[]): T[] {
 // Rotas de primeiro nível que NÃO podem ser tratadas como categoria
 export const RESERVED_SLUGS = new Set([
   'admin', 'api', 'cursos', 'checkout', 'carrinho', 'blog', 'sobre-nos', 'perguntas-frequentes',
-  'como-funciona', 'reconhecimento-mec', 'politica-de-privacidade', 'termos-de-uso', 'uploads',
+  'como-funciona', 'reconhecimento-mec', 'politica-de-privacidade', 'termos-de-uso', 'uploads', 'parceiros',
 ])

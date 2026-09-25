@@ -340,6 +340,133 @@ CREATE INDEX IF NOT EXISTS idx_auth_events_created ON auth_events(created_at);
 UPDATE courses SET category = 'Superior Sequencial' WHERE category = 'Superior';
 UPDATE blog_posts SET related_category = 'Superior Sequencial' WHERE related_category = 'Superior';
 
+-- =====================================================================
+-- v2.4 (2026-09) – menu retrátil, parcelado TMB, blog agendado
+-- =====================================================================
+
+-- Menu retrátil: a categoria "EJA" foi dividida em "EJA Ensino Fundamental" e "EJA Ensino Médio".
+-- Cursos só de Fundamental -> EJA Ensino Fundamental; os demais (Médio e "Fundamental e Médio") -> EJA Ensino Médio.
+-- Depois é só ajustar no admin, se precisar. A página /eja continua existindo e lista os dois.
+UPDATE courses SET category = 'EJA Ensino Fundamental'
+ WHERE category = 'EJA' AND f_unaccent(lower(title)) LIKE '%fundamental%' AND f_unaccent(lower(title)) NOT LIKE '%medio%';
+UPDATE courses SET category = 'EJA Ensino Médio' WHERE category = 'EJA';
+UPDATE blog_posts SET related_category = 'EJA Ensino Médio' WHERE related_category = 'EJA';
+
+-- Sinônimos de busca das categorias novas (entram no índice com peso B)
+CREATE OR REPLACE FUNCTION category_synonyms(cat text) RETURNS text AS $$
+  SELECT CASE lower(f_unaccent(coalesce(cat, '')))
+    WHEN 'eja' THEN 'eja supletivo ensino medio ensino fundamental jovens adultos terminar estudos'
+    WHEN 'eja ensino fundamental' THEN 'eja supletivo ensino fundamental fundamental jovens adultos terminar estudos'
+    WHEN 'eja ensino medio' THEN 'eja supletivo ensino medio segundo grau jovens adultos terminar estudos'
+    WHEN 'pos-graduacao' THEN 'pos posgraduacao pos-graduacao especializacao mba lato sensu'
+    WHEN 'graduacao' THEN 'graduacao faculdade bacharelado licenciatura ensino superior'
+    WHEN 'superior sequencial' THEN 'superior sequencial sequencial formacao especifica ensino superior curso superior'
+    WHEN 'tecnico' THEN 'tecnico curso tecnico profissionalizante'
+    WHEN 'pos-tecnico' THEN 'pos tecnico pos-tecnico especializacao tecnica'
+    WHEN 'tecnologo' THEN 'tecnologo superior graduacao tecnologica'
+    WHEN 'tecnico para tecnologo' THEN 'tecnico para tecnologo aproveitamento graduacao tecnologica'
+    WHEN 'segunda licenciatura' THEN 'segunda licenciatura 2 licenciatura professor habilitacao'
+    WHEN 'segunda graduacao' THEN 'segunda graduacao 2 graduacao faculdade aproveitamento'
+    WHEN 'mestrado e doutorado' THEN 'mestrado doutorado stricto sensu pos-graduacao'
+    WHEN 'livre' THEN 'livre curso livre capacitacao'
+    ELSE ''
+  END
+$$ LANGUAGE sql IMMUTABLE;
+
+-- Configurações internas (não saem na API pública /content)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Parcelado TMB: ofertas criadas pela API (uma por produto/preço/parcelas, reaproveitada)
+CREATE TABLE IF NOT EXISTS tmb_offers (
+  id SERIAL PRIMARY KEY,
+  category VARCHAR(100),
+  produto_id INTEGER NOT NULL,
+  valor DECIMAL(10,2) NOT NULL,
+  qtd_parcelas INTEGER NOT NULL,
+  titulo VARCHAR(200),
+  url TEXT NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (produto_id, valor, qtd_parcelas)
+);
+
+-- Parcelado TMB: registro de todo webhook recebido (auditoria e suporte)
+CREATE TABLE IF NOT EXISTS tmb_events (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  tmb_order_id INTEGER,
+  status_pedido VARCHAR(50),
+  fase_checkout VARCHAR(100),
+  payload JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_tmb_events_created ON tmb_events(created_at);
+-- entrada personalizada da oferta (valor_boleto_entrada na API da TMB): passa a fazer parte da chave da oferta
+ALTER TABLE tmb_offers ADD COLUMN IF NOT EXISTS valor_entrada DECIMAL(10,2);
+ALTER TABLE tmb_offers DROP CONSTRAINT IF EXISTS tmb_offers_produto_id_valor_qtd_parcelas_key;
+CREATE INDEX IF NOT EXISTS idx_tmb_offers_busca ON tmb_offers(produto_id, valor, qtd_parcelas);
+
+-- v2.4 (decisão do cliente em 24/09/2026): Tecnólogo e Superior Sequencial passam a ter o cartão
+-- em 12x SEM JUROS sobre o preço do PIX (antes: 12x R$ 249,84 = R$ 2.998,08 contra R$ 2.990,00 no PIX).
+-- Roda UMA vez (marca em app_settings); depois o admin pode mudar cada curso livremente.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'migracao_v24_parcela_sem_juros') THEN
+    UPDATE courses
+       SET price_installment = price_pix,
+           installment_value = ROUND(price_pix / NULLIF(installments, 0), 2)
+     WHERE category IN ('Tecnólogo', 'Superior Sequencial')
+       AND price_pix > 0 AND installments > 0
+       AND price_installment > price_pix;
+    INSERT INTO app_settings (key, data) VALUES ('migracao_v24_parcela_sem_juros', jsonb_build_object('em', NOW()));
+  END IF;
+END $$;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tmb_order_id INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tmb_status VARCHAR(50);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tmb_phase VARCHAR(100);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ga_client_id VARCHAR(40);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ga_purchase_sent BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_orders_tmb_order ON orders(tmb_order_id);
+
+-- v2.4: parceiros (instituições de ensino e empresas/convênios), com página própria em /parceiros/{slug}
+CREATE TABLE IF NOT EXISTS partners (
+  id SERIAL PRIMARY KEY,
+  type VARCHAR(20) NOT NULL DEFAULT 'ies',          -- 'ies' | 'empresa'
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  logo VARCHAR(500),
+  cover_image VARCHAR(500),
+  summary VARCHAR(600),                             -- resumo (lista e Google)
+  content TEXT,                                     -- texto da página (editor)
+  website VARCHAR(500),
+  city VARCHAR(120),
+  state VARCHAR(2),
+  -- instituição de ensino
+  emec_code VARCHAR(30),
+  emec_url VARCHAR(500),
+  accreditation TEXT,                               -- atos de credenciamento (portaria, data)
+  mec_score VARCHAR(20),                            -- CI / IGC
+  -- empresa / convênio
+  benefit VARCHAR(300),                             -- ex.: 15% de desconto em todos os cursos
+  coupon_code VARCHAR(100),
+  eligibility TEXT,                                 -- quem pode usar
+  -- vínculo com cursos e contato
+  related_category VARCHAR(100),
+  whatsapp_message TEXT,
+  featured BOOLEAN DEFAULT false,
+  active BOOLEAN DEFAULT true,
+  order_index INTEGER DEFAULT 0,
+  seo_title VARCHAR(500),
+  seo_description VARCHAR(500),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_partners_type ON partners(type, active);
+
 -- Trigger para updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -361,5 +488,10 @@ CREATE OR REPLACE TRIGGER update_orders_updated_at
 
 CREATE OR REPLACE TRIGGER update_blog_posts_updated_at
     BEFORE UPDATE ON blog_posts
+    FOR EACH ROW
+    EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE OR REPLACE TRIGGER update_partners_updated_at
+    BEFORE UPDATE ON partners
     FOR EACH ROW
     EXECUTE PROCEDURE update_updated_at_column();

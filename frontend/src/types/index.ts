@@ -116,6 +116,9 @@ export interface Order {
   payment_error?: string | null
   payment_status_detail?: string | null
   paid_at?: string | null
+  tmb_order_id?: number | null
+  tmb_status?: string | null
+  tmb_phase?: string | null
 }
 
 export interface ContentSection {

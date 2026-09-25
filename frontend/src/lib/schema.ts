@@ -127,3 +127,17 @@ export function articleSchema(post: { title: string; slug: string; excerpt?: str
 }
 
 export { categoryHref }
+
+// v2.4: página de parceiro (instituição de ensino ou empresa)
+export function partnerSchema(p: { type: string; name: string; slug: string; summary?: string | null; logo?: string | null; website?: string | null; city?: string | null; state?: string | null }) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': p.type === 'ies' ? 'CollegeOrUniversity' : 'Organization',
+    name: p.name,
+    url: p.website || absoluteUrl(`/parceiros/${p.slug}`),
+    description: p.summary || undefined,
+    logo: p.logo ? absoluteUrl(p.logo) : undefined,
+    address: p.city ? { '@type': 'PostalAddress', addressLocality: p.city, addressRegion: p.state || undefined, addressCountry: 'BR' } : undefined,
+    memberOf: { '@id': `${SITE_URL}/#organization` },
+  }
+}

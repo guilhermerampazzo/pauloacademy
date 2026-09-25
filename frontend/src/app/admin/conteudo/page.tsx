@@ -5,15 +5,13 @@ import toast from 'react-hot-toast'
 import api from '@/lib/api'
 import ImageUpload from '@/components/admin/ImageUpload'
 import RichTextEditor from '@/components/admin/RichTextEditor'
+import { MENU_CATEGORY_NAMES, slugifyCategory, menuLabel } from '@/lib/categories'
 
 // v2: categorias com página própria (textos padrão ficam em src/lib/categories.ts; aqui é possível sobrescrever)
+// v2.4: lista montada a partir do menu retrátil (src/lib/categories.ts) + a página de grupo /eja
 const CATEGORY_SLUGS = [
-  { slug: 'eja', label: 'EJA' },
-  { slug: 'tecnico', label: 'Técnico' },
-  { slug: 'graduacao', label: 'Graduação (Bacharelado)' },
-  { slug: 'tecnologo', label: 'Tecnólogo' },
-  { slug: 'superior-sequencial', label: 'Superior Sequencial' },
-  { slug: 'pos-graduacao', label: 'Pós-Graduação' },
+  { slug: 'eja', label: 'EJA (página que reúne Fundamental e Médio)' },
+  ...MENU_CATEGORY_NAMES.map(n => ({ slug: slugifyCategory(n), label: menuLabel(n) })),
 ]
 
 interface BenefitItem { icon: string; text: string }
@@ -276,7 +274,7 @@ export default function ConteudoPage() {
 
 
       {/* ===================== v2 ===================== */}
-      {sectionCard('tracking', <BarChart3 size={18} />, 'Rastreamento (Google Analytics 4 e Meta Pixel)', (
+      {sectionCard('tracking', <BarChart3 size={18} />, 'Rastreamento e compartilhamento (GA4, Meta Pixel e imagem)', (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="label">ID do GA4 (G-XXXXXXX)</label>
@@ -287,6 +285,11 @@ export default function ConteudoPage() {
             <input value={String(tracking.meta_pixel_id || '')} onChange={e => update('tracking', { ...tracking, meta_pixel_id: e.target.value.trim() })} className="input" placeholder="123456789012345" />
           </div>
           <p className="md:col-span-2 text-xs text-gray-400">Eventos enviados: view_item, add_to_cart, begin_checkout, purchase, search, select_item e whatsapp_click. Leva até 5 minutos para valer no site.</p>
+          {/* v2.4: imagem padrão dos links compartilhados */}
+          <div className="md:col-span-2 pt-2 border-t border-gray-100">
+            <ImageUpload value={String(tracking.og_image || '')} onChange={v => update('tracking', { ...tracking, og_image: v })} label="Imagem de compartilhamento (WhatsApp, Facebook) – 1200 x 630 px" />
+            <p className="text-xs text-gray-400 mt-1">Aparece quando alguém compartilha a home, as categorias e as páginas institucionais. Cursos e posts usam a própria capa. Se ficar vazio, o site usa a imagem padrão da Academy Pop.</p>
+          </div>
         </div>
       ))}
 

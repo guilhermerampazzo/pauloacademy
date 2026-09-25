@@ -72,6 +72,7 @@ export default function Footer({ data, categories = [] }: { data?: FooterData; c
               <li><Link href="/sobre-nos" className="hover:text-white transition-colors">Sobre nós</Link></li>
               <li><Link href="/como-funciona" className="hover:text-white transition-colors">Como funciona</Link></li>
               <li><Link href="/reconhecimento-mec" className="hover:text-white transition-colors">Reconhecimento MEC</Link></li>
+              <li><Link href="/parceiros" className="hover:text-white transition-colors">Parceiros</Link></li>
               <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
               <li><Link href="/perguntas-frequentes" className="hover:text-white transition-colors">Perguntas frequentes</Link></li>
             </ul>

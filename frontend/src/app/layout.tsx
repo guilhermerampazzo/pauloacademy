@@ -6,33 +6,39 @@ import '@fontsource-variable/inter'
 import './globals.css'
 import { CartProvider } from '@/lib/cart'
 import { SITE_URL, SITE_NAME, DEFAULT_DESCRIPTION } from '@/lib/site'
-import { getContent } from '@/lib/data'
+import { getContent, defaultOgImage } from '@/lib/data'
 import { organizationSchema, websiteSchema } from '@/lib/schema'
 import JsonLd from '@/components/JsonLd'
 import Analytics from '@/components/public/Analytics'
 
 // v2: metadados padrão com metadataBase, canonical, Open Graph e Twitter.
 // Cada página sobrescreve title/description/canonical/imagem.
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: 'Academy Pop – Cursos EAD Reconhecidos pelo MEC: EJA, Técnico, Graduação e Pós',
-    template: '%s | Academy Pop',
-  },
-  description: DEFAULT_DESCRIPTION,
-  applicationName: SITE_NAME,
-  alternates: { canonical: '/' },
-  openGraph: {
-    type: 'website',
-    locale: 'pt_BR',
-    siteName: SITE_NAME,
-    url: SITE_URL,
-    title: 'Academy Pop – Cursos EAD Reconhecidos pelo MEC',
+// v2.4: imagem padrão de compartilhamento (antes a home e as categorias saíam sem imagem no WhatsApp).
+export async function generateMetadata(): Promise<Metadata> {
+  const ogImage = await defaultOgImage()
+  const images = [{ url: ogImage, width: 1200, height: 630, alt: 'Academy Pop – cursos EAD' }]
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: 'Academy Pop – Cursos EAD Reconhecidos pelo MEC: EJA, Técnico, Graduação e Pós',
+      template: '%s | Academy Pop',
+    },
     description: DEFAULT_DESCRIPTION,
-  },
-  twitter: { card: 'summary_large_image' },
-  robots: { index: true, follow: true },
-  icons: { icon: '/favicon.svg' },
+    applicationName: SITE_NAME,
+    alternates: { canonical: '/' },
+    openGraph: {
+      type: 'website',
+      locale: 'pt_BR',
+      siteName: SITE_NAME,
+      url: SITE_URL,
+      title: 'Academy Pop – Cursos EAD Reconhecidos pelo MEC',
+      description: DEFAULT_DESCRIPTION,
+      images,
+    },
+    twitter: { card: 'summary_large_image', images: [ogImage] },
+    robots: { index: true, follow: true },
+    icons: { icon: '/favicon.svg' },
+  }
 }
 
 export const viewport: Viewport = {

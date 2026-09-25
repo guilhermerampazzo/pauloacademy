@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, BookOpen, Users, FileText, Tag, ShoppingBag, LogOut, GraduationCap, Settings, MessageSquareQuote, Newspaper, Search, KeyRound
+  LayoutDashboard, BookOpen, Users, FileText, Tag, ShoppingBag, LogOut, GraduationCap, Settings, MessageSquareQuote, Newspaper, Search, KeyRound, CalendarClock, Handshake
 } from 'lucide-react'
 import { removeToken } from '@/lib/auth'
 import clsx from 'clsx'
@@ -14,8 +14,10 @@ const links = [
   { href: '/admin/conteudo', label: 'Conteúdo', icon: FileText },
   { href: '/admin/depoimentos', label: 'Depoimentos', icon: MessageSquareQuote },
   { href: '/admin/blog', label: 'Blog', icon: Newspaper },
+  { href: '/admin/parceiros', label: 'Parceiros', icon: Handshake },
   { href: '/admin/cupons', label: 'Cupons', icon: Tag },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
+  { href: '/admin/tmb', label: 'Pagamentos TMB', icon: CalendarClock },
   { href: '/admin/buscas', label: 'Buscas no site', icon: Search },
   { href: '/admin/senha', label: 'Segurança da conta', icon: KeyRound },
 ]

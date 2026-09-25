@@ -1,20 +1,18 @@
-'use client'
-import { usePathname } from 'next/navigation'
-import Sidebar from '@/components/admin/Sidebar'
+import type { Metadata } from 'next'
+import AdminShell from '@/components/admin/AdminShell'
+
+// v2.4: o painel nunca é pré-gerado nem guardado em cache.
+// Antes, /admin, /admin/cursos e /admin/conteudo saíam como páginas estáticas com
+// "Cache-Control: s-maxage=31536000" (1 ano). Um cache na frente do servidor guardou a
+// versão anterior à 2.3 e continuava entregando: menu sem Blog e telas carregando sem parar.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export const metadata: Metadata = {
+  title: 'Painel',
+  robots: { index: false, follow: false },
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-
-  if (['/admin/login', '/admin/esqueci-senha', '/admin/redefinir-senha'].includes(pathname)) {
-    return <>{children}</>
-  }
-
-  return (
-    <div className="flex min-h-screen bg-gray-100">
-      <Sidebar />
-      <main className="flex-1 overflow-auto min-h-screen">
-        {children}
-      </main>
-    </div>
-  )
+  return <AdminShell>{children}</AdminShell>
 }

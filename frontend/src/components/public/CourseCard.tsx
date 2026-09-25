@@ -4,6 +4,7 @@ import { Clock, Monitor, Tag, ArrowRight } from 'lucide-react'
 import type { Course } from '@/types'
 import { getCategoryInfo } from '@/lib/categories'
 import { brl } from '@/lib/site'
+import { honestText } from '@/lib/pricing'
 import AddToCartButton from './AddToCartButton'
 
 // Card de curso.
@@ -46,7 +47,7 @@ export default function CourseCard({ course, priority = false }: { course: Cours
           <Link href={href}>{course.title}</Link>
         </h3>
         {course.subtitle && (
-          <p className="text-gray-500 text-sm mb-4 line-clamp-2">{course.subtitle}</p>
+          <p className="text-gray-500 text-sm mb-4 line-clamp-2">{honestText(course.subtitle, course)}</p>
         )}
 
         <div className="flex flex-wrap gap-3 mb-4 text-xs text-gray-500">

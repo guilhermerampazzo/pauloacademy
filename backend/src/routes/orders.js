@@ -7,8 +7,11 @@ const { priceCart } = require('../lib/pricing')
 const { getWhatsAppNumber } = require('../lib/settings')
 const { isValidCPF } = require('../lib/cpf')
 const mp = require('../lib/mercadopago')
+const tmb = require('../lib/tmb')
+const ga4 = require('../lib/ga4')
 
-const METHODS = ['pix', 'boleto', 'credit_card']
+// v2.4: 'tmb' = parcelado sem cartão (PIX ou boleto) pela TMB
+const METHODS = ['pix', 'boleto', 'credit_card', 'tmb']
 const brl = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 // Limita criação de pedidos por IP (evita spam de cobranças)
@@ -54,6 +57,13 @@ router.post('/quote', async (req, res) => {
     const { course_ids, coupon_code, payment_method } = req.body || {}
     const method = METHODS.includes(payment_method) ? payment_method : 'pix'
     const quote = await priceCart(course_ids, coupon_code, method)
+    // v2.4: informa se o parcelado sem cartão (TMB) vale para este carrinho
+    try {
+      const cfg = await tmb.getConfig()
+      quote.tmb = tmb.availability(cfg, quote)
+      // v2.4: simulação (entrada + parcelas) para a tabela do checkout
+      if (quote.tmb.available) quote.tmb.simulacao = tmb.simulate(cfg.categories[quote.items[0].category], quote.items[0].final_price)
+    } catch { quote.tmb = { available: false } }
     res.json(quote)
   } catch (err) {
     console.error(err)
@@ -95,6 +105,11 @@ router.post('/', orderLimiter, async (req, res) => {
   }
   if (!quote.items.length) return res.status(400).json({ error: 'Nenhum curso disponível para compra no carrinho' })
   if (quote.total <= 0) return res.status(400).json({ error: 'Valor do pedido inválido' })
+  if (method === 'tmb') {
+    const av = tmb.availability(await tmb.getConfig().catch(() => null), quote)
+    if (!av.available) return res.status(400).json({ error: av.reason || 'Parcelado sem cartão indisponível para este curso. Escolha outra forma de pagamento.' })
+  }
+  const gaClientId = /^\d{3,12}\.\d{6,12}$/.test(String(body.ga_client_id || '')) ? String(body.ga_client_id) : null
 
   const whatsappFallback = await buildWhatsApp(quote.items, customer.name, quote.total)
 
@@ -105,10 +120,10 @@ router.post('/', orderLimiter, async (req, res) => {
     await client.query('BEGIN')
     const { rows } = await client.query(
       `INSERT INTO orders (course_id, coupon_id, customer_name, customer_email, customer_phone, customer_cpf,
-                           amount, payment_method, status, access_token)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9) RETURNING *`,
+                           amount, payment_method, status, access_token, ga_client_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10) RETURNING *`,
       [quote.items[0].course_id, quote.coupon?.id || null, customer.name, customer.email, customer.phone,
-       customer.cpf || null, quote.total.toFixed(2), method, crypto.randomBytes(24).toString('hex')]
+       customer.cpf || null, quote.total.toFixed(2), method, crypto.randomBytes(24).toString('hex'), gaClientId]
     )
     order = rows[0]
     for (const it of quote.items) {
@@ -133,10 +148,31 @@ router.post('/', orderLimiter, async (req, res) => {
     whatsapp_fallback: whatsappFallback,
   }
 
-  // 2) Sem Mercado Pago configurado: segue pelo WhatsApp (comportamento anterior)
+  // 2) v2.4: parcelado sem cartão – link da oferta na TMB com as UTMs do pedido
+  if (method === 'tmb') {
+    try {
+      const it = quote.items[0]
+      const offer = await tmb.getOfferUrl({ category: it.category, price: it.final_price })
+      const url = tmb.withUtm(offer.url, { orderId: order.id, slug: it.slug })
+      await pool.query(`UPDATE orders SET payment_url = $1, payment_status_detail = $2 WHERE id = $3`,
+        [url, `tmb:link_${offer.source}`, order.id])
+      return res.status(201).json({ ...base, mode: 'tmb', payment_url: url })
+    } catch (err) {
+      const detail = err?.message || String(err)
+      console.error(`Erro TMB no pedido #${order.id}:`, detail)
+      await pool.query(`UPDATE orders SET payment_error = $1, status = 'failed' WHERE id = $2`, [String(detail).slice(0, 1000), order.id])
+      return res.status(502).json({
+        ...base,
+        mode: 'error',
+        error: 'Não foi possível abrir o parcelamento agora. Você pode tentar outra forma de pagamento ou concluir a matrícula pelo WhatsApp.',
+      })
+    }
+  }
+
+  // 3) Sem Mercado Pago configurado: segue pelo WhatsApp (comportamento anterior)
   if (!mp.isEnabled()) return res.status(201).json({ ...base, mode: 'whatsapp' })
 
-  // 3) Cria a cobrança no Mercado Pago
+  // 4) Cria a cobrança no Mercado Pago
   try {
     let payment = {}
     if (method === 'pix') {
@@ -267,6 +303,87 @@ async function markPaid(orderId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// v2.4: Webhook da TMB (Vendas e Etapas do Checkout)
+// Configurar na TMB: Produtos > [produto] > Integrações > Webhook Vendas (e, se quiser,
+// Etapas do Checkout) com URL https://academypopeduca.com.br/api/orders/webhook/tmb,
+// Chave = x-tmb-token e Valor = TMB_WEBHOOK_TOKEN do .env.
+// Eventos: "Efetivado" (entrada paga) -> pedido pago; "Cancelado" -> reembolsado/falhou.
+// A TMB pode mandar campos novos: tudo que não é usado é ignorado.
+// ---------------------------------------------------------------------------
+router.post('/webhook/tmb', async (req, res) => {
+  if (!tmb.verifyWebhook(req)) {
+    console.warn('Webhook TMB sem token válido – ignorado')
+    return res.status(401).json({ error: 'token inválido' })
+  }
+  const p = req.body || {}
+  try {
+    const result = await handleTmbEvent(p)
+    res.json({ ok: true, ...result })
+  } catch (err) {
+    console.error('Erro no webhook TMB:', err?.message || err)
+    res.status(500).json({ error: 'erro ao processar' }) // aparece como erro no histórico da TMB (dá para reenviar)
+  }
+})
+
+async function handleTmbEvent(p) {
+  const status = String(p.status_pedido || '').trim().toLowerCase()
+  const fase = String(p.fase_checkout || p.status_checkout || '').trim()
+  const tmbPedido = Number(p.pedido || p.pedido_id || 0) || null
+
+  // 1) Acha o pedido do site: UTM pedido-<id>, depois nº do pedido TMB, depois e-mail
+  let order = null
+  const oid = tmb.orderIdFromPayload(p)
+  if (oid) order = (await pool.query(`SELECT * FROM orders WHERE id = $1 AND payment_method = 'tmb'`, [oid])).rows[0]
+  if (!order && tmbPedido) order = (await pool.query(`SELECT * FROM orders WHERE tmb_order_id = $1`, [tmbPedido])).rows[0]
+  if (!order && p.email) {
+    order = (await pool.query(
+      `SELECT * FROM orders WHERE payment_method = 'tmb' AND lower(customer_email) = lower($1)
+         AND created_at > NOW() - INTERVAL '30 days' AND tmb_order_id IS NULL
+       ORDER BY created_at DESC LIMIT 1`, [String(p.email)])).rows[0]
+  }
+
+  await pool.query(
+    `INSERT INTO tmb_events (order_id, tmb_order_id, status_pedido, fase_checkout, payload) VALUES ($1,$2,$3,$4,$5)`,
+    [order?.id || null, tmbPedido, status || null, fase || null, JSON.stringify(p).slice(0, 100000)]
+  )
+  if (!order) {
+    console.warn(`Webhook TMB: pedido TMB ${tmbPedido} sem pedido correspondente no site`)
+    return { matched: false }
+  }
+
+  await pool.query(
+    `UPDATE orders SET tmb_order_id = COALESCE($1, tmb_order_id), tmb_status = COALESCE($2, tmb_status),
+            tmb_phase = COALESCE($3, tmb_phase), payment_id = COALESCE(payment_id, $4) WHERE id = $5`,
+    [tmbPedido, status || null, fase || null, tmbPedido ? `tmb-${tmbPedido}` : null, order.id]
+  )
+
+  if (fase && !status) {
+    await pool.query(`UPDATE orders SET payment_status_detail = $1 WHERE id = $2`, [`tmb:${fase}`.slice(0, 100), order.id])
+    return { matched: true, order_id: order.id, fase }
+  }
+
+  if (status === 'efetivado') {
+    const valor = Number(p.valor_principal || 0)
+    if (valor && valor + 0.01 < Number(order.amount)) {
+      await pool.query(`UPDATE orders SET payment_error = $1 WHERE id = $2`,
+        [`TMB efetivou com valor ${valor} menor que o pedido ${order.amount}. Confira antes de liberar.`, order.id])
+      return { matched: true, order_id: order.id, paid: false }
+    }
+    await pool.query(`UPDATE orders SET payment_status_detail = 'tmb:efetivado', payment_error = NULL WHERE id = $1`, [order.id])
+    await markPaid(order.id)
+    ga4.sendPurchase(order.id, { paymentType: 'tmb' }).catch(e => console.error('GA4 MP:', e.message))
+    return { matched: true, order_id: order.id, paid: true }
+  }
+  if (status === 'cancelado') {
+    await pool.query(`UPDATE orders SET status = CASE WHEN status = 'paid' THEN 'refunded' ELSE 'failed' END,
+                        payment_status_detail = 'tmb:cancelado' WHERE id = $1`, [order.id])
+    return { matched: true, order_id: order.id, cancelled: true }
+  }
+  if (status) await pool.query(`UPDATE orders SET payment_status_detail = $1 WHERE id = $2`, [`tmb:${status}`.slice(0, 100), order.id])
+  return { matched: true, order_id: order.id }
+}
+
 // Admin: alterar status manualmente
 router.put('/:id/status', requireAuth, async (req, res) => {
   try {
@@ -295,3 +412,4 @@ async function buildWhatsApp(items, customerName, amount) {
 module.exports = router
 module.exports.syncPayment = syncPayment
 module.exports.markPaid = markPaid
+module.exports.handleTmbEvent = handleTmbEvent

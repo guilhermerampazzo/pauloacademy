@@ -101,6 +101,7 @@ const PAGINAS = [
   { label: 'Reconhecimento MEC', href: '/reconhecimento-mec' },
   { label: 'Perguntas frequentes', href: '/perguntas-frequentes' },
   { label: 'Sobre nós', href: '/sobre-nos' },
+  { label: 'Parceiros', href: '/parceiros' },
 ]
 
 interface CursoBusca { id: number; slug: string; title: string; category: string }
